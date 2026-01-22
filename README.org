@@ -1,0 +1,15 @@
+#+title: Readme
+
+* Midi-Captain for Fractal Audio Devices (FM3, FM9,...)
+FM3, FM9등 Fractal Audio Systems 제품 특화된 Midi-Captain Customizing
+
+참고 사이트
+
++ [[https://github.com/nicola-lunghi/hiper-midicaptain?tab=readme-ov-file][hiper-midicaptain]] :: MidiCatain Customizing 출발점으로 좋은 사이트
+  - Midi-Captain Spec 소개
+  - Mu Editor를 사용한 Adafruit PySwitch Customizing 방법 소개
+
+** [[file:doc/mu.org][Mu Editor 사용법 정리]]
+** Fractal Audio System SysEx Guide
+[[https://wiki.fractalaudio.com/wiki/index.php?title=MIDI_SysEx][On-line]]
+[[file:doc/Axe-Fx III MIDI for 3rd Party Devices.pdf][Off-line]]

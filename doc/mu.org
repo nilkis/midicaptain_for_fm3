@@ -1,0 +1,32 @@
+#+title: Mu
+
+* Mu Editor 사용법
+
+([[https://learn.adafruit.com/welcome-to-circuitpython/installing-mu-editor][Mu Editor 홈페이지]])
+
++ Start the midi captain in fw update mode (switch 0 pressed at boot)
+  - switch 0 : 미디캡틴에서 스위치 "1"
++ Mu-Editor에서 연결된 미디캡틴 디바이스의 boot.py file을 연다.
++ Mu-Editor serial console을 연다(상단 "Serial" 아이콘)
++ comment the following lines to enable autoreload
+
+#+begin_example
+# import supervisor
+# supervisor.disable_autoreload()
+#+end_example
+
++ Restart in fw update mode. You will see:
+#+begin_example
+Adafruit CircuitPython 7.3.1 on 2022-06-22; Raspberry Pi Pico with rp2040
+>>>
+#+end_example
+
++ if you modify the boot.py or the code.py files you will see
+#+begin_example
+Auto-reload is on. Simply save files over USB to run them or enter REPL to disable.
+code.py output:
+#+end_example
+
++ You can stop the boot pressing Enter at the prompt, or soft reboot with Ctrl+D
++ 실제 코드는 "code.py"에 작성한다. Mu Editor에서 "save"아이콘을 누르면 수정된
+  내용이 자동 reload된다.
