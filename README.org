@@ -9,7 +9,15 @@ FM3, FM9등 Fractal Audio Systems 제품 특화된 Midi-Captain Customizing
   - Midi-Captain Spec 소개
   - Mu Editor를 사용한 Adafruit PySwitch Customizing 방법 소개
 
-** [[file:doc/mu.org][Mu Editor 사용법 정리]]
+** CircuitPython libs
+Midicaptaion CPU board에는 CircuitPython이 내장되어 있다.
+CircuitPython에 포함되지 않은 python package는
+[[https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/20231003/adafruit-circuitpython-bundle-7.x-mpy-20231003.zip][CircuitPython library bundle]] 에서 추출하여 MidiCaptain lib directory에 복사한다
+
++ asyncio
++ enum : 지원하지 않음
+
+** [[file:doc/mu.org][Mu Editor 사용법]]
 ** Fractal Audio System SysEx Guide
 [[https://wiki.fractalaudio.com/wiki/index.php?title=MIDI_SysEx][On-line]]
 [[file:doc/Axe-Fx III MIDI for 3rd Party Devices.pdf][Off-line]]
