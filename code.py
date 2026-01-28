@@ -15,6 +15,7 @@ import gc
 FRACTAL_MFR_ID = (0x00, 0x01, 0x74)
 FM3_MODEL_ID = 0x11
 GET_FX_STATUS = 0x13
+PUSH_TAP_TEMPO = 0x10
 
 # ============================================================
 # Button Configuration (10 buttons)
@@ -31,7 +32,7 @@ BUTTON_PINS = (
 )
 BUTTON_COLORS_ON = (
 #    (0, 0, 0), (0, 0, 0), (0, 0, 0),
-    (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0),
+    (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 255),
     (100, 100, 0), (255, 0, 0), (0, 204, 204), (0, 0, 255), (0, 0, 0),    # cyan,red,yellow,blue , ,
 )
 OFF_W = 0.02
@@ -39,13 +40,27 @@ BUTTON_COLORS_OFF = [[int(x[0]*OFF_W), int(x[1]*OFF_W) , int(x[2]*OFF_W)] for x 
 
 EFFECT_NAMES = (
 #    "NONE", "NONE", "NONE",
-    "NONE", "NONE", "NONE", "NONE", "NONE",
-    "COMPRESSOR1", "DRIVE1", "CHORUS1", "DELAY1", "NONE",
+    "NONE", "NONE", "NONE", "NONE", "TUNER",
+    "COMPRESSOR1", "DRIVE1", "CHORUS1", "DELAY1", "TEMPO",
 )
+
+EFFECTS_NONE = 9999
+TUNER = 999
+TEMPO = 998
+SCENE_ID0 = 990
+SCENE1 = SCENE_ID0 + 0
+SCENE2 = SCENE_ID0 + 1
+SCENE3 = SCENE_ID0 + 2
+SCENE4 = SCENE_ID0 + 3
+SCENE5 = SCENE_ID0 + 4
+SCENE6 = SCENE_ID0 + 5
+SCENE7 = SCENE_ID0 + 6
+SCENE8 = SCENE_ID0 + 7
+
 EFFECT_IDS = (
 #    999, 999, 999,
-    999, 999, 999, 999, 999,
-    46, 118, 78, 70, 999,
+    EFFECTS_NONE, EFFECTS_NONE, EFFECTS_NONE, EFFECTS_NONE, TUNER,
+    46, 118, 78, 70, TEMPO,
 )
 EFFECT_MAPS = {EFFECT_IDS[i]:EFFECT_NAMES[i] for i in range(len(EFFECT_NAMES))}
 
@@ -102,25 +117,34 @@ class FM3Controller:
 
         self.pixels = neopixel.NeoPixel(board.GP7, 30, auto_write=False, brightness=1)
 
+    def _led_on(self, button_idx):
+        pidx = button_idx * 3
+        col = BUTTON_COLORS_ON[button_idx]
+        self.pixels[pidx] = self.pixels[pidx + 1] = self.pixels[pidx + 2] = col
+        self.pixels.show()
+
+    def _led_off(self, button_idx):
+        pidx = button_idx * 3
+        col = BUTTON_COLORS_OFF[button_idx]
+        self.pixels[pidx] = self.pixels[pidx + 1] = self.pixels[pidx + 2] = col
+        self.pixels.show()
+
     def update_leds(self):
         """Effect 상태에 따라 LED 업데이트"""
         for effect_id, button_idx in self.effect_to_button.items():
             if effect_id in self.effect_states:
                 engaged = not self.effect_states[effect_id]["bypassed"]
                 if engaged:
-                    col = BUTTON_COLORS_ON[button_idx]
+                    self._led_on(button_idx)
                 else:
-                    col = BUTTON_COLORS_OFF[button_idx]
-
-                pidx = button_idx * 3
-                self.pixels[pidx] = self.pixels[pidx + 1] = self.pixels[pidx + 2] = col
-                self.pixels.show()
+                    self._led_off(button_idx)
 
     def _change_effect_bypass(self, effect_id, value):
+        cid = 0x11 if effect_id == TUNER else 0x0A
         mid = [0x00, 0x01,0x74]
         b2 = int(effect_id)//128
         b1 = int(effect_id)%128
-        data = [FM3_MODEL_ID, 0x0A, b1, b2, value]
+        data = [FM3_MODEL_ID, cid, b1, b2, value]
         data.append(calc_checksum(mid, data))
         msg = SystemExclusive(manufacturer_id=mid, data=data)
         self.midi.send(msg)
@@ -136,52 +160,71 @@ class FM3Controller:
             print(f">>>> {name} short pressed. event_time={self.event_time[button_idx]}")
 
         effect_id = EFFECT_IDS[button_idx]
-        value = not self.effect_states[effect_id]['bypassed']
-        self._change_effect_bypass(effect_id, value)
+        if effect_id == EFFECTS_NONE:
+            return
+        bypassed = self.effect_states[effect_id]['bypassed']
+        #if bypassed:
+        #    self._led_on(button_idx)
+        #else:
+        #    self._led_off(button_idx)
+        self._change_effect_bypass(effect_id, not bypassed)
 
     def process_buttons(self):
         """★ keypad 이벤트 큐에서 버튼 이벤트 처리"""
         # 큐에 쌓인 모든 이벤트 처리
+        ecount = 0
         while True:
             event = self.keys.events.get()
             if event is None:
                 break
             if event.pressed:
                 self.event_time[event.key_number] = event.timestamp
+                ecount += 1
             if event.released:
                 self.event_time[event.key_number] = event.timestamp - self.event_time[event.key_number]
                 self._handle_button_press(event.key_number)
+                ecount += 1
+
+        return ecount > 0
 
     def parse_status_response(self, data):
         """FM3 응답 파싱"""
         if len(data) < 3:
             return False
 
-        if data[0] != FM3_MODEL_ID or data[1] != GET_FX_STATUS:
+        if data[0] != FM3_MODEL_ID:
             return False
 
-        packets_data = data[2:-1]
+        if data[1] == GET_FX_STATUS:
+            packets_data = data[2:-1]
 
-        for i in range(0, len(packets_data) - 2, 3):
-            id_lo = packets_data[i]
-            id_hi = packets_data[i + 1]
-            dd = packets_data[i + 2]
+            for i in range(0, len(packets_data) - 2, 3):
+                id_lo = packets_data[i]
+                id_hi = packets_data[i + 1]
+                dd = packets_data[i + 2]
 
-            #effect_id = id_lo | (id_hi << 7)
-            effect_id = int(id_lo) + 128 * int(id_hi)
-            bypassed = bool(dd & 0x01)
-            channel = (dd >> 1) & 0x07
+                #effect_id = id_lo | (id_hi << 7)
+                effect_id = int(id_lo) + 128 * int(id_hi)
+                bypassed = bool(dd & 0x01)
+                channel = (dd >> 1) & 0x07
 
-            if effect_id in self.effect_states:
-                prev_bypass = self.effect_states[effect_id]["bypassed"]
-                if prev_bypass != bypassed:
-                    print(f"effect: id={effect_id} changed. {prev_bypass} -> {bypassed}")
-            self.effect_states[effect_id] = {
-                "bypassed": bypassed,
-                "channel": channel,
+                if effect_id in self.effect_states:
+                    prev_bypass = self.effect_states[effect_id]["bypassed"]
+                    if prev_bypass != bypassed:
+                        print(f"effect: id={effect_id} changed. {prev_bypass} -> {bypassed}")
+                self.effect_states[effect_id] = {
+                    "bypassed": bypassed,
+                    "channel": channel,
+                }
+
+            return True
+        elif data[1] == PUSH_TAP_TEMPO:
+            self.effect_states[TEMPO] = {
+                "bypassed": 0,
+                "channel": 0,
             }
-
-        return True
+        else:
+            return False
 
     def process_midi_in(self):
         """MIDI IN 처리"""
@@ -213,13 +256,13 @@ class FM3Controller:
             now = time.monotonic()
 
             # 1. ★ 버튼 이벤트 처리 (큐에서 가져옴 - 놓치지 않음)
-            self.process_buttons()
+            event_count = self.process_buttons()
 
             # 2. MIDI IN 처리
             self.process_midi_in()
 
             # 3. 주기적 상태 쿼리
-            if now - self.last_query_time > self.query_interval:
+            if event_count == 0 and now - self.last_query_time > self.query_interval:
                 self.send_status_query()
                 self.last_query_time = now
 
