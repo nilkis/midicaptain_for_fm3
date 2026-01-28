@@ -1,0 +1,30 @@
+#+title: V1
+
+* V1
+편집기 없는 고정형
+- Effects on/off
+- Scene Select
+- Tuner
+- Tap Tempo
+
+switch 배열
+|---+---+---+---+----|
+| 1 | 2 | 3 | 4 | UP |
+|---+---+---+---+----|
+| A | B | C | D | DN |
+|-  |   |   |   |    |
+
+|--------+----------------+------------|
+| switch | short press    | long press |
+|--------+----------------+------------|
+| 1      | Scene 1        | Scene 5    |
+| 2      | Scene 2        | Scene 6    |
+| 3      | Scene 3        | Scene 7    |
+| 4      | Scene 4        | Scene 8    |
+| A      | Comp1 on/off   |            |
+| B      | Drive1 on/off  |            |
+| C      | Delay1 on/off  |            |
+| D      | Chorus1 on/off |            |
+| UP     | Tuner          |            |
+| DN     | Tap Tempo      |            |
+|--------+----------------+------------|
