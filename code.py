@@ -3,8 +3,12 @@ import board
 import keypad
 import neopixel
 import busio
+import displayio
+import terminalio
 import adafruit_midi
 from adafruit_midi.system_exclusive import SystemExclusive
+from adafruit_st7789 import ST7789
+from adafruit_display_text import label
 import gc
 
 # ============================================================
@@ -12,8 +16,9 @@ import gc
 # ============================================================
 FRACTAL_MFR_ID = (0x00, 0x01, 0x74)
 FM3_MODEL_ID = 0x11
-GET_FX_STATUS = 0x13
+SET_SCENE = 0x0C
 SET_FX_STATUS = 0x0A
+GET_FX_STATUS = 0x13
 TAP_TEMPO_FUNC = 0x10
 TUNER_FUNC = 0x11
 
@@ -23,6 +28,7 @@ EFFECT_IDS = {
     "DRIVE1": 118,
     "CHORUS1": 78,
     "DELAY1": 70,
+    "PHASER1": 90,
 }
 
 # ============================================================
@@ -40,27 +46,34 @@ BUTTON_NAMES = (
 )
 
 COLOR_ENGAGED = (
-    (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 255),
-    (100, 100, 0), (255, 0, 0), (0, 204, 204), (0, 0, 255), (0, 0, 0),
+    (0, 255, 0), (0, 255, 0), (0, 0, 0), (0, 0, 0), (0, 0, 255),
+    (255, 0, 255), (255, 0, 0), (0, 204, 204), (0, 0, 255), (0, 0, 0),
 )
 OFF_W = 0.02
 COLOR_BYPASSED = [[int(x[0]*OFF_W), int(x[1]*OFF_W) , int(x[2]*OFF_W)] for x in COLOR_ENGAGED]
-COLOR_TAP_FLASH = (255, 80, 0)
-COLOR_TAP_IDLE = (0, 80, 255)  # Tap 버튼 기본색 (파랑)
+COLOR_TAP_FLASH = (0, 0, 255)
+COLOR_TAP_IDLE = (0, 0, 50)  # Tap 버튼 기본색 (파랑)
 
 # 버튼 설정: effect 또는 tap_tempo
 BUTTON_CONFIG = [
+    {"type": "effect", "effect": "PHASER1"},
+    {"type": "scene", "number": 8},
     {"type": "none"},
     {"type": "none"},
-    {"type": "none"},
-    {"type": "none"},
-    {"type": "tuner", "color": (0, 0, 255)},
+    {"type": "tuner"},
     {"type": "effect", "effect": "COMPRESSOR1"},
     {"type": "effect", "effect": "DRIVE1"},
     {"type": "effect", "effect": "CHORUS1"},
     {"type": "effect", "effect": "DELAY1"},
     {"type": "tap_tempo"},
 ]
+
+# Display SPI pins
+DISPLAY_CLK = board.GP14
+DISPLAY_MOSI = board.GP15
+DISPLAY_DC = board.GP12
+DISPLAY_CS = board.GP13
+DISPLAY_BL = board.GP8
 
 NEOPIXEL_PIN = board.GP7
 NUM_PIXELS = 30    # BUTTON당 3개
@@ -174,6 +187,17 @@ class FM3Controller:
             interval=0.02,
         )
 
+        # Display setup
+        displayio.release_displays()
+        spi = busio.SPI(clock=DISPLAY_CLK, MOSI=DISPLAY_MOSI)
+        display_bus = displayio.FourWire(
+            spi, command=DISPLAY_DC, chip_select=DISPLAY_CS
+        )
+        self.display = ST7789(
+            display_bus, width=240, height=240,
+            rowstart=80, rotation=180, backlight_pin=DISPLAY_BL,
+        )
+
         self.leds = LEDManager(NEOPIXEL_PIN, NUM_PIXELS, TAP_TEMPO_IDX)
         self.tap = TapTempo()
 
@@ -244,6 +268,10 @@ class FM3Controller:
         data = None
         if btype == "tuner":
             data = [FM3_MODEL_ID, TUNER_FUNC, 1]
+        elif btype == "scene":
+            data = [FM3_MODEL_ID, SET_SCENE, cfg["number"]-1]
+            # ★ 즉시 LED 토글 (낙관적 업데이트)
+            self.leds.toggle(idx)
         elif btype == "effect":
             # Effect toggle
             fx_id = EFFECT_IDS.get(cfg["effect"], 0)
@@ -295,8 +323,57 @@ class FM3Controller:
         # Block Status
         self.parse_fx_status(data)
 
+    def show_welcome(self):
+        # Display welcome message
+        splash = displayio.Group()
+
+        # Black background
+        bg_bitmap = displayio.Bitmap(240, 240, 1)
+        bg_palette = displayio.Palette(1)
+        bg_palette[0] = 0x000000
+        splash.append(displayio.TileGrid(bg_bitmap, pixel_shader=bg_palette))
+
+        # "MIDI Captain" title
+        title = label.Label(
+            terminalio.FONT, text="MIDI Captain",
+            color=0xFFFFFF, scale=3,
+            anchor_point=(0.5, 0.5), anchored_position=(120, 100),
+        )
+        splash.append(title)
+
+        # "for FM3" subtitle
+        subtitle = label.Label(
+            terminalio.FONT, text="for FM3",
+            color=0x00AAFF, scale=2,
+            anchor_point=(0.5, 0.5), anchored_position=(120, 140),
+        )
+        splash.append(subtitle)
+
+        self.display.show(splash)
+
+        # LED sequential animation
+        for i in range(10):
+            base = i * 3
+            color = COLOR_ENGAGED[i]
+            for j in range(3):
+                self.leds.pixels[base + j] = color
+            self.leds.pixels.show()
+            time.sleep(0.15)
+
+        # Hold all LEDs on briefly
+        time.sleep(0.5)
+
+        # Turn off all LEDs
+        for i in range(NUM_PIXELS):
+            self.leds.pixels[i] = (0, 0, 0)
+        self.leds.pixels.show()
+
+        # Clear display
+        self.display.show(displayio.Group())
+
     def run(self):
         print("FM3 Controller Started")
+        self.show_welcome()
         self.send_query()
         gc_count = 0
 

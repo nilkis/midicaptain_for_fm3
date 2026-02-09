@@ -3,7 +3,7 @@
 * Midi-Captain for Fractal Audio Devices (FM3, FM9,...)
 FM3, FM9등 Fractal Audio Systems 제품 특화된 Midi-Captain Customizing
 
-참고 사이트
+** 참고 사이트
 
 + [[https://github.com/nicola-lunghi/hiper-midicaptain?tab=readme-ov-file][hiper-midicaptain]] :: MidiCatain Customizing 출발점으로 좋은 사이트
   - Midi-Captain Spec 소개
@@ -14,9 +14,77 @@ Midicaptaion CPU board에는 CircuitPython이 내장되어 있다.
 CircuitPython에 포함되지 않은 python package는
 [[https://github.com/adafruit/Adafruit_CircuitPython_Bundle/releases/download/20231003/adafruit-circuitpython-bundle-7.x-mpy-20231003.zip][CircuitPython library bundle]] 에서 추출하여 MidiCaptain lib directory에 복사한다
 
-+ asyncio
-+ enum : 지원하지 않음
+** Midi-Captain H/W spec
+*** Display (화면)                                                                                                                                                     
+  |---------------+-------------------------------------------------------|
+  | 항목          | 규격                                                  |
+  |---------------+-------------------------------------------------------|
+  | 타입          | Adafruit 1.54" Color IPS TFT LCD                      |
+  | 컨트롤러 칩   | ST7789                                                |
+  | 해상도        | 240 x 240 pixels                                      |
+  | 통신 프로토콜 | SPI                                                   |
+  | 핀 배치       | Clock(GP14), MOSI(GP15), DC(GP12), CS(GP13), PWM(GP8) |
+  | 설정          | rowstart=80, rotation=180                             |
+  |-              |                                                       |
+  CircuitPython에서는 adafruit_st7789 라이브러리를 사용합니다. (design.org:72 참고)
 
+*** Rotary Encoder (로터리 휠)
+  |---------------+----------------------------|
+  | 항목          | 규격                       |
+  |---------------+----------------------------|
+  | 타입          | Incremental Rotary Encoder |
+  | Encoder A     | GP2                        |
+  | Encoder B     | GP3                        |
+  | Switch (누름) | GP0                        |
+  | 프로토콜      | Digital GPIO Input         |
+  |-              |                            |
+  
+*** 기타 주요 하드웨어
+  |------------------+------------------------------------------------|
+  | 항목             | 규격                                           |
+  |------------------+------------------------------------------------|
+  | MCU              | Raspberry Pi RP2040 (Dual-core ARM Cortex-M0+) |
+  | 펌웨어           | CircuitPython 7.3.1                            |
+  | LED              | 30개 Neopixel RGB (GP7) - 버튼당 3개씩         |
+  | MIDI I/O         | UART (TX: GP16, RX: GP17)                      |
+  | Expression Pedal | 아날로그 입력 2개 (GP27, GP28)                 |
+  | 스위치           | 총 10개 풋스위치                               |
+  | 무선             | BK2461 Serial RF 모듈                          |
+  | 전원             | 배터리 + 전압 모니터링 (GP29)                  |
+  |-                 |                                                |
+  참고 출처: https://github.com/nicola-lunghi/hiper-midicaptain
+
+*** 풋스위치 10개 GPIO 맵
+  물리 배열
+  
+  |---+---+---+---+----|
+  | 1 | 2 | 3 | 4 | UP |
+  |---+---+---+---+----|
+  | A | B | C | D | DN |
+  |-  |   |   |   |    |
+  GPIO 핀 매핑
+  |-----------+------+----------------|
+  | Switch    | GPIO | 비고           |
+  |-----------+------+----------------|
+  | Switch 1  | GP1  | Scene 1 / 5    |
+  | Switch 2  | GP25 | Scene 2 / 6    |
+  | Switch 3  | GP24 | Scene 3 / 7    |
+  | Switch 4  | GP23 | Scene 4 / 8    |
+  | Switch UP | GP20 | Tuner          |
+  | Switch A  | GP9  | Comp1 on/off   |
+  | Switch B  | GP10 | Drive1 on/off  |
+  | Switch C  | GP11 | Delay1 on/off  |
+  | Switch D  | GP18 | Chorus1 on/off |
+  | Switch DN | GP19 | Tap Tempo      |
+  |-          |      |                |
+  Rotary Encoder (별도 3핀)
+  |-------------------+------|
+  | 기능              | GPIO |
+  |-------------------+------|
+  | Encoder SW (누름) | GP0  |
+  | Encoder A         | GP2  |
+  | Encoder B         | GP3  |
+  |-                  |      |
 ** [[file:doc/mu.org][Mu Editor 사용법]]
 ** Fractal Audio System SysEx Guide
 [[https://wiki.fractalaudio.com/wiki/index.php?title=MIDI_SysEx][On-line]]

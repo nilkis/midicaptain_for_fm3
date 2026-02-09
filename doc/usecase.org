@@ -1,0 +1,73 @@
+#+title: Usecase
+
+* 전원 스위치 ON
++ Display에 Welcome Message를 보여준다.
++ 10개의 Button LED로 Welcome light를 보여준다.
++ Welcom message/light가 끝나면 FM3 현재 Tap Tempo BPM/preset name/scene name 을
+  화면에 계속 보여준다.
+
+* Tuner/Tap Tempo
++ 10개 버튼 중 Down Switch에 Tuner / Tap Tempo 기능을 할당하였다.
++ 버튼을 long press(500ms) 하면 떼는 순간 FM3 화면에 Tuner가 디스플레이 된다.
+  + long press는 항상 떼는 순간 기능을 활성화하게 한다.
++ 다시 버튼을 long press하면  FM3 tuner가 사라진다.
++ 이 버튼은 현재 FM3에 설정된 BPM에 맞춰 Blink한다.
++ 이 버튼을 짧게 계속 누르면 누르는 간격에 맞춰 FM3 Tap Tempo BPM이 변경된다.
++ 이 때 Midicaptain display에는 현재 바뀌는 BPM 값을 보여준다.
+
+* Scene Select
+** 버튼 기능 할당
++ Button 1, 2, 3, 4 에 다음과 같이 기능을 할당하였다.
+  |-------------+---------+---------+---------+---------|
+  | Button      | 1       | 2       | 3       | 4       |
+  |-------------+---------+---------+---------+---------|
+  | short press | scene 1 | scene 2 | scene 3 | scene 4 |
+  |-------------+---------+---------+---------+---------|
+  | long press  | scene 5 | scene 6 | scene 7 | scene 8 |
+  |-            |         |         |         |         |
+
++ Button 1, 2, 3, 4 LED 에 다음과 같이 색상을 할당하였다.
+  |-------------+-------+-------+-------+-------|
+  | Button      | 1     | 2     | 3     | 4     |
+  |-------------+-------+-------+-------+-------|
+  | short press | red   | red   | red   | red   |
+  |-------------+-------+-------+-------+-------|
+  | long press  | green | green | green | green |
+  |-------------+-------+-------+-------+-------|
+
+** 버튼 동작 예시 1
+1. Button 1을 short press하면 Button LED 1이 red 색상으로 바뀐다. 나머지 2, 3, 4,
+  LED는 꺼진다.
+   + 이 때 Button 1, 2, 3, 4외의 다른 버튼의 색상은 영향받지 않는다. 
+2. FM3의 scene이 scene 1로 변경된다.
+3. Midicaptain display의 scene 이름이 변경된다.
+
+** 버튼 동작 예시 2
+1. Button 3을 long press하면 Button LED 3이 green 색상으로 바뀐다. 나머지 1, 2, 4
+   LED 는 꺼진다.
+   + 이 때 Button 1, 2, 3, 4외의 다른 버튼의 색상은 영향받지 않는다. 
+2. FM3의 scene이 scene 7로 변경된다.
+3. Midicaptain display의 scene 이름이 변경된다.
+
+* Effects On/Off
+** 버튼 기능 할당
++ Button 1, 2, 3, 4 에 다음과 같이 기능을 할당하였다.
+  |-------------+--------------+---------------+----------------+---------------|
+  | Button      | A            | B             | C              | D             |
+  |-------------+--------------+---------------+----------------+---------------|
+  | short press | Comp1 on/off | Drive1 on/off | Chrous1 on/off | Delay1 on/off |
+  |-------------+--------------+---------------+----------------+---------------|
+
++ Button 1, 2, 3, 4 LED 에 다음과 같이 색상을 할당하였다.
+  |-------------+--------+--------+------+------|
+  | Button      | A      | B      | C    | D    |
+  |-------------+--------+--------+------+------|
+  | short press | yellow | orange | cyan | blue |
+  |-------------+--------+--------+------+------|
+
+* 정리 필요
+** Button LED 색상
++ activate되었을 때의 색상만 정한다
++ deactivate되면 activate색상의 30% 정도의 밝기를 낸다
++ 해당 Button이 기능을 할 수 없을 때는 완전히 끈다
+  - ex) Comp1 on/off를 할당했으나 해당 프리셋에 Comp1이 없을 때
