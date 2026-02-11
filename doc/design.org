@@ -11,6 +11,7 @@ command 위주로 사용하여 FM3를 제어하는 기능을 제공하며 제어
 이 프로젝트는 이러한 상태 불일치 문제를 해결하고 편의 기능을 추가하여 FC6 처럼
 FM3와 일체화된 Controller를 만드는 것이 목적이다.
 
+* 지원 기능
 * Usecases
 ** case1 : MC를 FM3 effects on/off 용도로 사용
 MD의 Button A,B,C,D를 Comp1, Drive1, Chorus1, Delay1을 on/off할 수 있게
