@@ -49,7 +49,7 @@ EFFECT_IDS = {
     "TREMOLO1": 106, "TREMOLO2": 107,
     "PITCH1": 110,
     "FILTER1": 114, "FILTER2": 115, "FILTER3": 116, "FILTER4": 117,
-    "FUZZ1": 118, "FUZZ2": 119,
+    "DRIVE1": 118, "DRIVE2": 119,
     "ENHANCER1": 122, "ENHANCER2": 123,
     "MIXER1": 126, "MIXER2": 127, "MIXER3": 128, "MIXER4": 129,
     "SYNTH1": 130,
@@ -153,8 +153,8 @@ DEFAULT_CONFIG = [
     },
     # switchB: drive1 toggle / channel rotation
     {
-        "short": {"type": "effect", "effect": "FUZZ1"},
-        "long": {"type": "channel_rotation", "effect": "FUZZ1"},
+        "short": {"type": "effect", "effect": "DRIVE1"},
+        "long": {"type": "channel_rotation", "effect": "DRIVE1"},
         "color_short": [255, 128, 0],
         "color_long": [0, 0, 0],
     },
@@ -364,8 +364,9 @@ class FM3Controller:
 
         # Edit mode
         self.edit_mode = False
-        self.edit_level = 0       # 0=button select, 1=param edit
+        self.edit_level = 0       # 0=button select, 1=press type, 2=param edit
         self.edit_btn_idx = 0
+        self.edit_press_idx = 0   # 0=short, 1=long (confirmed when entering level 2)
         self.edit_menu_idx = 0
         self.edit_editing_value = False
 
@@ -506,14 +507,25 @@ class FM3Controller:
         self.grp_edit.append(self.lbl_edit_title)
 
         self.lbl_edit_lines = []
-        for row in range(4):
+        for row in range(5):
             l = label.Label(
                 terminalio.FONT, text="",
                 color=0xAAAAAA, scale=2,
-                anchor_point=(0.0, 0.0), anchored_position=(5, 50 + row * 45),
+                anchor_point=(0.0, 0.0), anchored_position=(5, 32 + row * 38),
             )
             self.grp_edit.append(l)
             self.lbl_edit_lines.append(l)
+
+        # Level 0 그리드 오른쪽 열 — 독립 색상 제어용
+        self.lbl_edit_grid_r = []
+        for row in range(5):
+            l = label.Label(
+                terminalio.FONT, text="",
+                color=0x888888, scale=2,
+                anchor_point=(0.0, 0.0), anchored_position=(125, 32 + row * 38),
+            )
+            self.grp_edit.append(l)
+            self.lbl_edit_grid_r.append(l)
 
         # Track which group is currently shown
         self._current_group = None
@@ -521,7 +533,6 @@ class FM3Controller:
     def _show_group(self, grp):
         if self._current_group is not grp:
             self.display.show(grp)
-            self.display.refresh()
             self._current_group = grp
 
     # --------------------------------------------------------
@@ -927,7 +938,8 @@ class FM3Controller:
                 else:
                     self._set_label(self.lbl_tuner_cents, "%+d cents" % cents)
                     self.lbl_tuner_cents.color = 0xFFFF00
-            self._show_group(self.grp_tuner)
+                self._show_group(self.grp_tuner)
+                self.display.refresh()
             return
 
         # Temp expired → action 영역 클리어
@@ -953,7 +965,10 @@ class FM3Controller:
             else:
                 self._set_label(self.lbl_action_name, "")
                 self._set_label(self.lbl_action_state, "")
-        self._show_group(self.grp_normal)
+            self._show_group(self.grp_normal)
+            self.display.refresh()
+        else:
+            self._show_group(self.grp_normal)
 
     def _refresh_display(self, now):
         """수동 display refresh — throttled"""
@@ -966,7 +981,9 @@ class FM3Controller:
     # --------------------------------------------------------
     EDIT_TYPES = ["effect", "scene", "tap_tempo", "tuner", "preset_inc", "preset_dec",
                   "channel_toggle", "channel_rotation", "none"]
-    EFFECT_LIST = list(EFFECT_IDS.keys())
+    EFFECT_LIST = sorted(EFFECT_IDS.keys())
+    EDIT_PARAMS = ["Type", "Target", "Color1", "Color2", "Color3", "Back"]
+    BTN_ABBREV  = ("sw1", "sw2", "sw3", "sw4", "swUp", "swA", "swB", "swC", "swD", "swDn")
 
     def process_encoder(self):
         sw_state = not self.encoder_sw.value
@@ -997,6 +1014,7 @@ class FM3Controller:
         self.edit_mode = True
         self.edit_level = 0
         self.edit_btn_idx = 0
+        self.edit_press_idx = 0
         self.edit_menu_idx = 0
         self.edit_editing_value = False
         self.display_dirty = True
@@ -1010,16 +1028,22 @@ class FM3Controller:
 
     def _edit_click(self):
         if self.edit_level == 0:
+            # 버튼 선택 → Short/Long 선택 화면으로
             self.edit_level = 1
             self.edit_menu_idx = 0
-            self.edit_editing_value = False
         elif self.edit_level == 1:
-            menu_items = self._get_edit_menu()
-            if self.edit_menu_idx >= len(menu_items):
-                return
-            item = menu_items[self.edit_menu_idx]
-            if item == "Back":
+            # Short(0) / Long(1) / Back(2)
+            if self.edit_menu_idx == 2:   # Back → 버튼 선택으로 복귀
                 self.edit_level = 0
+            else:
+                self.edit_press_idx = self.edit_menu_idx
+                self.edit_level = 2
+                self.edit_menu_idx = 0
+                self.edit_editing_value = False
+        elif self.edit_level == 2:
+            if self.edit_menu_idx == len(self.EDIT_PARAMS) - 1:  # "Back"
+                self.edit_level = 1
+                self.edit_menu_idx = self.edit_press_idx  # 이전 Short/Long 커서 복원
                 self.edit_editing_value = False
             else:
                 self.edit_editing_value = not self.edit_editing_value
@@ -1029,50 +1053,32 @@ class FM3Controller:
         if self.edit_level == 0:
             self.edit_btn_idx = (self.edit_btn_idx + delta) % NUM_BUTTONS
         elif self.edit_level == 1:
+            self.edit_menu_idx = (self.edit_menu_idx + delta) % 3  # Short / Long / Back
+        elif self.edit_level == 2:
             if self.edit_editing_value:
                 self._edit_change_value(delta)
             else:
-                menu_items = self._get_edit_menu()
-                self.edit_menu_idx = (self.edit_menu_idx + delta) % len(menu_items)
+                self.edit_menu_idx = (self.edit_menu_idx + delta) % len(self.EDIT_PARAMS)
         self.display_dirty = True
 
-    def _get_edit_menu(self):
-        return ["Short Type", "Short Target", "Long Type", "Long Target",
-                "Color S R", "Color S G", "Color S B",
-                "Color L R", "Color L G", "Color L B",
-                "Back"]
-
     def _edit_change_value(self, delta):
+        press_type = "short" if self.edit_press_idx == 0 else "long"
         cfg = self.config[self.edit_btn_idx]
-        menu_items = self._get_edit_menu()
-        item = menu_items[self.edit_menu_idx]
+        item = self.EDIT_PARAMS[self.edit_menu_idx]
 
-        if item == "Short Type":
-            cur = cfg.get("short", {}).get("type", "none")
+        if item == "Type":
+            cur = cfg.get(press_type, {}).get("type", "none")
             i = self.EDIT_TYPES.index(cur) if cur in self.EDIT_TYPES else 0
             i = (i + delta) % len(self.EDIT_TYPES)
-            cfg.setdefault("short", {})["type"] = self.EDIT_TYPES[i]
-        elif item == "Short Target":
-            self._edit_target(cfg, "short", delta)
-        elif item == "Long Type":
-            cur = cfg.get("long", {}).get("type", "none")
-            i = self.EDIT_TYPES.index(cur) if cur in self.EDIT_TYPES else 0
-            i = (i + delta) % len(self.EDIT_TYPES)
-            cfg.setdefault("long", {})["type"] = self.EDIT_TYPES[i]
-        elif item == "Long Target":
-            self._edit_target(cfg, "long", delta)
-        elif item.startswith("Color S"):
-            ch = item[-1]
-            c = list(cfg.get("color_short", [0, 0, 0]))
-            ci = "RGB".index(ch)
-            c[ci] = max(0, min(255, c[ci] + delta * 5))
-            cfg["color_short"] = c
-        elif item.startswith("Color L"):
-            ch = item[-1]
-            c = list(cfg.get("color_long", [0, 0, 0]))
-            ci = "RGB".index(ch)
-            c[ci] = max(0, min(255, c[ci] + delta * 5))
-            cfg["color_long"] = c
+            cfg.setdefault(press_type, {})["type"] = self.EDIT_TYPES[i]
+        elif item == "Target":
+            self._edit_target(cfg, press_type, delta)
+        elif item in ("Color1", "Color2", "Color3"):
+            ci = int(item[-1]) - 1
+            c = list(cfg.get("color_" + press_type, [0, 0, 0]))
+            c[ci] = (c[ci] + delta * 5) % 256
+            cfg["color_" + press_type] = c
+            self._update_button_leds(self.edit_btn_idx)
 
     def _edit_target(self, cfg, press_type, delta):
         action = cfg.get(press_type, {})
@@ -1097,71 +1103,87 @@ class FM3Controller:
         self.display_dirty = False
 
         if self.edit_level == 0:
-            sw_name = BUTTON_NAMES[self.edit_btn_idx]
-            self._set_label(self.lbl_edit_title, "[EDIT] Select SW")
-            self._set_label(self.lbl_edit_lines[0], "")
-            self._set_label(self.lbl_edit_lines[1], "> %s" % sw_name)
-            self.lbl_edit_lines[1].color = 0xFFFFFF
-            self._set_label(self.lbl_edit_lines[2], "")
-            self._set_label(self.lbl_edit_lines[3], "")
-        else:
-            cfg = self.config[self.edit_btn_idx]
-            sw_name = BUTTON_NAMES[self.edit_btn_idx]
-            self._set_label(self.lbl_edit_title, "[EDIT] %s" % sw_name)
-
-            menu_items = self._get_edit_menu()
-            start = max(0, self.edit_menu_idx - 1)
-            end = min(len(menu_items), start + 4)
-            for row in range(4):
-                mi = start + row
-                if mi < end:
-                    item = menu_items[mi]
-                    val = self._get_edit_value_str(cfg, item)
-                    prefix = ">" if mi == self.edit_menu_idx else " "
-                    if mi == self.edit_menu_idx and self.edit_editing_value:
-                        prefix = "*"
-                    self._set_label(self.lbl_edit_lines[row], "%s %s: %s" % (prefix, item[:8], val[:10]))
-                    self.lbl_edit_lines[row].color = 0x00FF00 if mi == self.edit_menu_idx else 0xAAAAAA
-                else:
-                    self._set_label(self.lbl_edit_lines[row], "")
+            self._draw_edit_level0()
+        elif self.edit_level == 1:
+            self._draw_edit_level1()
+        elif self.edit_level == 2:
+            self._draw_edit_level2()
 
         self._show_group(self.grp_edit)
+        self.display.refresh()
 
-    def _get_edit_value_str(self, cfg, item):
-        if item == "Short Type":
-            return cfg.get("short", {}).get("type", "none")
-        elif item == "Short Target":
-            a = cfg.get("short", {})
+    def _draw_edit_level0(self):
+        # 5행 2열 그리드: 왼열(sw1~swUp) / 오른열(swA~swDn) — 셀 독립 하이라이트
+        self._set_label(self.lbl_edit_title, "[EDIT] Select SW")
+        for row in range(5):
+            li, ri = row, row + 5
+            l_sel = (self.edit_btn_idx == li)
+            r_sel = (self.edit_btn_idx == ri)
+            self._set_label(self.lbl_edit_lines[row],
+                            "%s %s" % (">" if l_sel else " ", self.BTN_ABBREV[li]))
+            self.lbl_edit_lines[row].color = 0x00FF00 if l_sel else 0x888888
+            self._set_label(self.lbl_edit_grid_r[row],
+                            "%s %s" % (">" if r_sel else " ", self.BTN_ABBREV[ri]))
+            self.lbl_edit_grid_r[row].color = 0x00FF00 if r_sel else 0x888888
+
+    def _draw_edit_level1(self):
+        # Short Press / Long Press / Back
+        sw_name = BUTTON_NAMES[self.edit_btn_idx]
+        self._set_label(self.lbl_edit_title, "[EDIT] %s" % sw_name)
+        items = ["Short Press", "Long Press", "Back"]
+        for i, item in enumerate(items):
+            prefix = ">" if self.edit_menu_idx == i else " "
+            self._set_label(self.lbl_edit_lines[i], "%s %s" % (prefix, item))
+            self.lbl_edit_lines[i].color = 0x00FF00 if self.edit_menu_idx == i else 0xAAAAAA
+        for i in range(3, 5):
+            self._set_label(self.lbl_edit_lines[i], "")
+        for i in range(5):
+            self._set_label(self.lbl_edit_grid_r[i], "")
+
+    def _draw_edit_level2(self):
+        # 파라미터 편집: Type / Target / Color1~3 / Back
+        for i in range(5):
+            self._set_label(self.lbl_edit_grid_r[i], "")
+        press_label = "Short" if self.edit_press_idx == 0 else "Long"
+        press_type  = "short" if self.edit_press_idx == 0 else "long"
+        self._set_label(self.lbl_edit_title,
+                        "%s > %s" % (self.BTN_ABBREV[self.edit_btn_idx], press_label))
+        cfg = self.config[self.edit_btn_idx]
+        params = self.EDIT_PARAMS          # 6 items
+        start = max(0, self.edit_menu_idx - 4)  # 5행 스크롤 윈도우
+        for row in range(5):
+            mi = start + row
+            if mi < len(params):
+                item = params[mi]
+                val  = self._get_param_value(cfg, press_type, item)
+                if mi == self.edit_menu_idx and self.edit_editing_value:
+                    prefix = "*"
+                elif mi == self.edit_menu_idx:
+                    prefix = ">"
+                else:
+                    prefix = " "
+                self._set_label(self.lbl_edit_lines[row],
+                                "%s%-7s:%s" % (prefix, item, val))
+                self.lbl_edit_lines[row].color = 0x00FF00 if mi == self.edit_menu_idx else 0xAAAAAA
+            else:
+                self._set_label(self.lbl_edit_lines[row], "")
+
+    def _get_param_value(self, cfg, press_type, item):
+        if item == "Type":
+            return cfg.get(press_type, {}).get("type", "none")
+        elif item == "Target":
+            a = cfg.get(press_type, {})
             t = a.get("type", "none")
             if t in ("effect", "channel_toggle", "channel_rotation"):
                 return a.get("effect", "?")
             elif t == "scene":
                 return str(a.get("number", "?"))
             return "-"
-        elif item == "Long Type":
-            return cfg.get("long", {}).get("type", "none")
-        elif item == "Long Target":
-            a = cfg.get("long", {})
-            t = a.get("type", "none")
-            if t in ("effect", "channel_toggle", "channel_rotation"):
-                return a.get("effect", "?")
-            elif t == "scene":
-                return str(a.get("number", "?"))
-            return "-"
-        elif item == "Color S R":
-            return str(cfg.get("color_short", [0, 0, 0])[0])
-        elif item == "Color S G":
-            return str(cfg.get("color_short", [0, 0, 0])[1])
-        elif item == "Color S B":
-            return str(cfg.get("color_short", [0, 0, 0])[2])
-        elif item == "Color L R":
-            return str(cfg.get("color_long", [0, 0, 0])[0])
-        elif item == "Color L G":
-            return str(cfg.get("color_long", [0, 0, 0])[1])
-        elif item == "Color L B":
-            return str(cfg.get("color_long", [0, 0, 0])[2])
+        elif item in ("Color1", "Color2", "Color3"):
+            ci = int(item[-1]) - 1
+            return str(cfg.get("color_" + press_type, [0, 0, 0])[ci])
         elif item == "Back":
-            return "<-"
+            return ""
         return ""
 
     # --------------------------------------------------------
@@ -1275,9 +1297,6 @@ class FM3Controller:
                 self._update_edit_display()
             else:
                 self._update_display()
-
-            # 9. Display refresh (수동 — auto_refresh=False)
-            self._refresh_display(now)
 
             # 10. GC
             gc_count += 1

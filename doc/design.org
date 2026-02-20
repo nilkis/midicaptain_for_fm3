@@ -276,6 +276,32 @@ PDF Appendix 1의 enum 순서 기반. =ID_CONTROL = 2=, =ID_TUNER = 35= 로 시�
 | MIXER       |     126 | ID_MIXER1    |
 | SYNTH       |     130 | ID_SYNTH1    |
 
+** 편집 화면 Navigation
+|-----------+-------------|
+| Switch 1  | Switch A    |
+| Switch 2  | Switch B    |
+| Switch 3  | Switch C    |
+| Switch 4  | Switch D    |
+| Switch Up | Switch Down |
+|-----------+-------------|
+-->
+|-------------|
+| Short Press |
+| Long Press  |
+|-            |
+-->
+
+Short Press:
+|---------+----------|
+| Type    |   effect |
+| Target  | GRAPHEQ1 |
+| Color 1 |      255 |
+| Color 2 |        0 |
+| Color 3 |        0 |
+|-        |          |
++ rotary를 돌려 값이 limit에 도달하면 처음으로 돌아가기
+  - ex: color 숫자 0 -> 255 -> 0, 255 -> 0 -> 255
+     
 * Usecases
 ** case1 : MC를 FM3 effects on/off 용도로 사용
 MC의 Button A,B,C,D를 Comp1, Drive1, Chorus1, Delay1을 on/off할 수 있게
