@@ -369,6 +369,7 @@ class FM3Controller:
         self.edit_press_idx = 0   # 0=short, 1=long (confirmed when entering level 2)
         self.edit_menu_idx = 0
         self.edit_editing_value = False
+        self.edit_color_comp = 0  # 색상 편집 중 활성 컴포넌트: 0=R, 1=G, 2=B
 
         # Build lookup tables
         self._build_lookups()
@@ -752,28 +753,20 @@ class FM3Controller:
             state_str = "ON" if was_bypassed else "OFF"
             self._show_temp(fx_name, state_str)
 
-        elif atype == "channel_toggle":
-            fx_name = action.get("effect", "")
-            fx_id = EFFECT_IDS.get(fx_name)
-            if fx_id is None:
-                return
-            cur_ch = self.fx_channels.get(fx_id, 0)
-            new_ch = 1 if cur_ch == 0 else 0
-            self.send_set_channel(fx_id, new_ch)
-            self.fx_channels[fx_id] = new_ch
-            self._update_channel_leds(fx_id)
-            self._show_temp(fx_name, "CH.%s" % chr(65 + new_ch))
-
         elif atype == "channel_rotation":
             fx_name = action.get("effect", "")
             fx_id = EFFECT_IDS.get(fx_name)
             if fx_id is None:
                 return
             cur_ch = self.fx_channels.get(fx_id, 0)
-            num_ch = self.fx_num_channels.get(fx_id, 4)
-            if num_ch < 2:
-                num_ch = 4
-            new_ch = (cur_ch + 1) % num_ch
+            available = sorted(action.get("channels", [0, 1, 2, 3]))
+            if not available:
+                available = [0, 1, 2, 3]
+            try:
+                idx = available.index(cur_ch)
+            except ValueError:
+                idx = -1
+            new_ch = available[(idx + 1) % len(available)]
             self.send_set_channel(fx_id, new_ch)
             self.fx_channels[fx_id] = new_ch
             self._update_channel_leds(fx_id)
@@ -817,13 +810,17 @@ class FM3Controller:
         if s_type == "tap_tempo":
             return
 
-        # Effect toggle + channel toggle/rotation combo
-        if s_type == "effect" and l_type in ("channel_toggle", "channel_rotation"):
+        # Effect toggle + channel_rotation combo
+        if s_type == "effect" and l_type == "channel_rotation":
             fx_name = short_action.get("effect", "")
             fx_id = EFFECT_IDS.get(fx_name)
             if fx_id is not None:
                 ch = self.fx_channels.get(fx_id, 0)
-                ch_color = CHANNEL_COLORS[ch % len(CHANNEL_COLORS)]
+                ch_colors_raw = long_action.get("ch_colors", None)
+                if ch_colors_raw and ch < len(ch_colors_raw):
+                    ch_color = tuple(ch_colors_raw[ch])
+                else:
+                    ch_color = CHANNEL_COLORS[ch % len(CHANNEL_COLORS)]
                 bypassed = self.fx_states.get(fx_id, True)
                 color = ch_color if not bypassed else color_off(ch_color)
                 self.leds.set_button_color(idx, color)
@@ -980,7 +977,7 @@ class FM3Controller:
     # Edit mode (Rotary Encoder)
     # --------------------------------------------------------
     EDIT_TYPES = ["effect", "scene", "tap_tempo", "tuner", "preset_inc", "preset_dec",
-                  "channel_toggle", "channel_rotation", "none"]
+                  "channel_rotation", "none"]
     EFFECT_LIST = sorted(EFFECT_IDS.keys())
     EDIT_PARAMS = ["Type", "Target", "Color1", "Color2", "Color3", "Back"]
     BTN_ABBREV  = ("sw1", "sw2", "sw3", "sw4", "swUp", "swA", "swB", "swC", "swD", "swDn")
@@ -995,7 +992,7 @@ class FM3Controller:
         elif not sw_state and self.encoder_sw_pressed:
             self.encoder_sw_pressed = False
             duration = now - self.encoder_sw_press_time
-            if duration >= 2.0:
+            if duration >= 1.0:
                 if self.edit_mode:
                     self._exit_edit_mode()
                 else:
@@ -1017,6 +1014,7 @@ class FM3Controller:
         self.edit_press_idx = 0
         self.edit_menu_idx = 0
         self.edit_editing_value = False
+        self.edit_color_comp = 0
         self.display_dirty = True
 
     def _exit_edit_mode(self):
@@ -1041,10 +1039,23 @@ class FM3Controller:
                 self.edit_menu_idx = 0
                 self.edit_editing_value = False
         elif self.edit_level == 2:
-            if self.edit_menu_idx == len(self.EDIT_PARAMS) - 1:  # "Back"
+            press_type = "short" if self.edit_press_idx == 0 else "long"
+            params = self._get_edit_params(self.config[self.edit_btn_idx], press_type)
+            item = params[self.edit_menu_idx]
+            if item == "Back":
                 self.edit_level = 1
-                self.edit_menu_idx = self.edit_press_idx  # 이전 Short/Long 커서 복원
+                self.edit_menu_idx = self.edit_press_idx
                 self.edit_editing_value = False
+                self.edit_color_comp = 0
+            elif item in ("Color", "Col.A", "Col.B", "Col.C", "Col.D"):
+                if not self.edit_editing_value:
+                    self.edit_editing_value = True
+                    self.edit_color_comp = 0   # R부터 시작
+                else:
+                    self.edit_color_comp += 1  # R→G→B→종료
+                    if self.edit_color_comp > 2:
+                        self.edit_editing_value = False
+                        self.edit_color_comp = 0
             else:
                 self.edit_editing_value = not self.edit_editing_value
         self.display_dirty = True
@@ -1058,32 +1069,69 @@ class FM3Controller:
             if self.edit_editing_value:
                 self._edit_change_value(delta)
             else:
-                self.edit_menu_idx = (self.edit_menu_idx + delta) % len(self.EDIT_PARAMS)
+                press_type = "short" if self.edit_press_idx == 0 else "long"
+                params = self._get_edit_params(self.config[self.edit_btn_idx], press_type)
+                self.edit_menu_idx = (self.edit_menu_idx + delta) % len(params)
         self.display_dirty = True
+
+    def _get_edit_params(self, cfg, press_type):
+        atype = cfg.get(press_type, {}).get("type", "none")
+        if atype == "channel_rotation":
+            return ["Type", "Target",
+                    "Ch.A", "Ch.B", "Ch.C", "Ch.D",
+                    "Col.A", "Col.B", "Col.C", "Col.D",
+                    "Back"]
+        else:
+            return ["Type", "Target", "Color", "Back"]
 
     def _edit_change_value(self, delta):
         press_type = "short" if self.edit_press_idx == 0 else "long"
         cfg = self.config[self.edit_btn_idx]
-        item = self.EDIT_PARAMS[self.edit_menu_idx]
+        params = self._get_edit_params(cfg, press_type)
+        item = params[self.edit_menu_idx]
 
         if item == "Type":
             cur = cfg.get(press_type, {}).get("type", "none")
             i = self.EDIT_TYPES.index(cur) if cur in self.EDIT_TYPES else 0
             i = (i + delta) % len(self.EDIT_TYPES)
             cfg.setdefault(press_type, {})["type"] = self.EDIT_TYPES[i]
+
         elif item == "Target":
             self._edit_target(cfg, press_type, delta)
-        elif item in ("Color1", "Color2", "Color3"):
-            ci = int(item[-1]) - 1
+
+        elif item == "Color":
             c = list(cfg.get("color_" + press_type, [0, 0, 0]))
-            c[ci] = (c[ci] + delta * 5) % 256
+            c[self.edit_color_comp] = (c[self.edit_color_comp] + delta * 5) % 256
             cfg["color_" + press_type] = c
+            self._update_button_leds(self.edit_btn_idx)
+
+        elif item.startswith("Ch."):
+            ch = "ABCD".index(item[-1])
+            action = cfg.setdefault(press_type, {})
+            channels = list(action.get("channels", [0, 1, 2, 3]))
+            if delta > 0:
+                if ch not in channels:
+                    channels.append(ch)
+            else:
+                if ch in channels and len(channels) > 1:  # 최소 1채널 유지
+                    channels.remove(ch)
+            action["channels"] = sorted(channels)
+
+        elif item.startswith("Col."):
+            ch = "ABCD".index(item[-1])
+            action = cfg.setdefault(press_type, {})
+            raw = action.get("ch_colors", [list(c) for c in CHANNEL_COLORS])
+            ch_colors = [list(c) for c in raw]
+            while len(ch_colors) <= ch:
+                ch_colors.append([0, 0, 0])
+            ch_colors[ch][self.edit_color_comp] = (ch_colors[ch][self.edit_color_comp] + delta * 5) % 256
+            action["ch_colors"] = ch_colors
             self._update_button_leds(self.edit_btn_idx)
 
     def _edit_target(self, cfg, press_type, delta):
         action = cfg.get(press_type, {})
         atype = action.get("type", "none")
-        if atype == "effect":
+        if atype in ("effect", "channel_rotation"):
             cur = action.get("effect", "")
             i = self.EFFECT_LIST.index(cur) if cur in self.EFFECT_LIST else 0
             i = (i + delta) % len(self.EFFECT_LIST)
@@ -1091,11 +1139,6 @@ class FM3Controller:
         elif atype == "scene":
             cur = action.get("number", 1)
             action["number"] = max(1, min(8, cur + delta))
-        elif atype in ("channel_toggle", "channel_rotation"):
-            cur = action.get("effect", "")
-            i = self.EFFECT_LIST.index(cur) if cur in self.EFFECT_LIST else 0
-            i = (i + delta) % len(self.EFFECT_LIST)
-            action["effect"] = self.EFFECT_LIST[i]
 
     def _update_edit_display(self):
         if not self.display_dirty:
@@ -1141,7 +1184,6 @@ class FM3Controller:
             self._set_label(self.lbl_edit_grid_r[i], "")
 
     def _draw_edit_level2(self):
-        # 파라미터 편집: Type / Target / Color1~3 / Back
         for i in range(5):
             self._set_label(self.lbl_edit_grid_r[i], "")
         press_label = "Short" if self.edit_press_idx == 0 else "Long"
@@ -1149,22 +1191,31 @@ class FM3Controller:
         self._set_label(self.lbl_edit_title,
                         "%s > %s" % (self.BTN_ABBREV[self.edit_btn_idx], press_label))
         cfg = self.config[self.edit_btn_idx]
-        params = self.EDIT_PARAMS          # 6 items
-        start = max(0, self.edit_menu_idx - 4)  # 5행 스크롤 윈도우
+        params = self._get_edit_params(cfg, press_type)
+        start = max(0, self.edit_menu_idx - 4)
         for row in range(5):
             mi = start + row
             if mi < len(params):
                 item = params[mi]
-                val  = self._get_param_value(cfg, press_type, item)
-                if mi == self.edit_menu_idx and self.edit_editing_value:
-                    prefix = "*"
-                elif mi == self.edit_menu_idx:
-                    prefix = ">"
+                is_sel  = (mi == self.edit_menu_idx)
+                is_edit = is_sel and self.edit_editing_value
+                if item in ("Color", "Col.A", "Col.B", "Col.C", "Col.D"):
+                    if is_edit:
+                        # 편집 중: 활성 컴포넌트만 표시
+                        comp = "RGB"[self.edit_color_comp]
+                        val = self._get_param_value(cfg, press_type, item)
+                        # val = "(R,G,B)" → 해당 컴포넌트 값 추출
+                        nums = [int(x) for x in val.strip("()").split(",")]
+                        text = "*%s.%s:%d" % (item, comp, nums[self.edit_color_comp])
+                    else:
+                        val = self._get_param_value(cfg, press_type, item)
+                        text = "%s%s:%s" % (">" if is_sel else " ", item, val)
                 else:
-                    prefix = " "
-                self._set_label(self.lbl_edit_lines[row],
-                                "%s%-7s:%s" % (prefix, item, val))
-                self.lbl_edit_lines[row].color = 0x00FF00 if mi == self.edit_menu_idx else 0xAAAAAA
+                    val = self._get_param_value(cfg, press_type, item)
+                    prefix = "*" if is_edit else (">" if is_sel else " ")
+                    text = "%s%-7s:%s" % (prefix, item, val)
+                self._set_label(self.lbl_edit_lines[row], text)
+                self.lbl_edit_lines[row].color = 0x00FF00 if is_sel else 0xAAAAAA
             else:
                 self._set_label(self.lbl_edit_lines[row], "")
 
@@ -1174,14 +1225,23 @@ class FM3Controller:
         elif item == "Target":
             a = cfg.get(press_type, {})
             t = a.get("type", "none")
-            if t in ("effect", "channel_toggle", "channel_rotation"):
+            if t in ("effect", "channel_rotation"):
                 return a.get("effect", "?")
             elif t == "scene":
                 return str(a.get("number", "?"))
             return "-"
-        elif item in ("Color1", "Color2", "Color3"):
-            ci = int(item[-1]) - 1
-            return str(cfg.get("color_" + press_type, [0, 0, 0])[ci])
+        elif item == "Color":
+            c = cfg.get("color_" + press_type, [0, 0, 0])
+            return "(%d,%d,%d)" % (c[0], c[1], c[2])
+        elif item.startswith("Ch."):
+            ch = "ABCD".index(item[-1])
+            channels = cfg.get(press_type, {}).get("channels", [0, 1, 2, 3])
+            return "ON" if ch in channels else "OFF"
+        elif item.startswith("Col."):
+            ch = "ABCD".index(item[-1])
+            raw = cfg.get(press_type, {}).get("ch_colors", list(CHANNEL_COLORS))
+            c = list(raw[ch]) if ch < len(raw) else [0, 0, 0]
+            return "(%d,%d,%d)" % (c[0], c[1], c[2])
         elif item == "Back":
             return ""
         return ""
