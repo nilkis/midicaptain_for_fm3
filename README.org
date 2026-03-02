@@ -89,3 +89,6 @@ CircuitPython에 포함되지 않은 python package는
 ** Fractal Audio System SysEx Guide
 [[https://wiki.fractalaudio.com/wiki/index.php?title=MIDI_SysEx][On-line]]
 [[file:doc/Axe-Fx III MIDI for 3rd Party Devices.pdf][Off-line]]
+
+** Issues
++ effects block이 현재 scene에 없을 때 LED 완전히 off
