@@ -678,6 +678,10 @@ class FM3Controller:
     def _parse_status_dump(self, data):
         if len(data) < 4 or data[1] != STATUS_DUMP:
             return
+        # 새 프리셋의 덤프 — 이전 상태를 모두 지우고 다시 채운다
+        self.fx_states.clear()
+        self.fx_channels.clear()
+        self.fx_num_channels.clear()
         packets = data[2:-1]
         for i in range(0, len(packets) - 2, 3):
             id_lo = packets[i]
@@ -687,17 +691,11 @@ class FM3Controller:
             bypassed = bool(dd & 0x01)
             channel = (dd >> 1) & 0x07
             num_ch = (dd >> 4) & 0x07
-
-            # 변경된 effect만 LED 업데이트
-            old_bypassed = self.fx_states.get(fx_id)
-            old_channel = self.fx_channels.get(fx_id)
             self.fx_states[fx_id] = bypassed
             self.fx_channels[fx_id] = channel
             self.fx_num_channels[fx_id] = num_ch
-
-            if (old_bypassed != bypassed or old_channel != channel) and fx_id in self.fx_to_btn:
-                for btn_idx in self.fx_to_btn[fx_id]:
-                    self._update_button_leds(btn_idx)
+        # 프리셋이 바뀌었으므로 모든 버튼 LED 일괄 갱신
+        self._update_all_button_leds()
 
     # --------------------------------------------------------
     # Button handling
@@ -815,13 +813,17 @@ class FM3Controller:
             fx_name = short_action.get("effect", "")
             fx_id = EFFECT_IDS.get(fx_name)
             if fx_id is not None:
+                if fx_id not in self.fx_states:
+                    # 현재 프리셋에 없는 effect → 완전히 꺼짐
+                    self.leds.set_button_color(idx, (0, 0, 0))
+                    return
                 ch = self.fx_channels.get(fx_id, 0)
                 ch_colors_raw = long_action.get("ch_colors", None)
                 if ch_colors_raw and ch < len(ch_colors_raw):
                     ch_color = tuple(ch_colors_raw[ch])
                 else:
                     ch_color = CHANNEL_COLORS[ch % len(CHANNEL_COLORS)]
-                bypassed = self.fx_states.get(fx_id, True)
+                bypassed = self.fx_states[fx_id]
                 color = ch_color if not bypassed else color_off(ch_color)
                 self.leds.set_button_color(idx, color)
                 return
@@ -865,7 +867,10 @@ class FM3Controller:
             fx_name = action.get("effect", "")
             fx_id = EFFECT_IDS.get(fx_name)
             if fx_id is not None:
-                bypassed = self.fx_states.get(fx_id, True)
+                if fx_id not in self.fx_states:
+                    # 현재 프리셋에 없는 effect → 완전히 꺼짐
+                    return (0, 0, 0)
+                bypassed = self.fx_states[fx_id]
                 return color if not bypassed else color_off(color)
             return color_off(color)
 
