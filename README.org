@@ -2,12 +2,68 @@
 
 * Midi-Captain for Fractal Audio Devices (FM3, FM9,...)
 FM3, FM9등 Fractal Audio Systems 제품 특화된 Midi-Captain Customizing
+양방향 통신을 사용해서 Effects Block의 on/off변화를 미디 캡틴과 동기화
+
+** 프로젝트 목적
+
+*** Pain Point
+- 미디캡틴은 CC/PC 커맨드 등 단방향 통신 미디 컨트롤러이기 때문에 제어하는 대상 기기의 상태를 읽어들이지 못함
+- Preset 변경, Scene 변경, Effects block 상태 변경 등 제어는 가능하나 effects block의 현 상태를 알지 못하여 effect on/off 상태 불일치가 발생함
+- 예) Clean scene에서 OD1 scene으로 scene을 변경하여 Drive1 effect block이 on되었으나, 미디캡틴의 Drive1 on/off 스위치 상태는 여전히 off로 표시됨
+
+*** 해결책
+SysEx 미디 프로토콜(Fractal FM3/FM9 등에서 지원)을 사용한 *양방향 통신* 으로 FM3/FM9의 상태를 주기적으로 읽어 미디캡틴의 LED/Display에 실시간 반영
+- Effects block on/off 및 채널(X/Y 등) 상태 동기화
+- 현재 Scene 번호, Preset/Scene 이름, BPM 표시
+- Tap tempo LED 동기화, Tuner 화면 표시
 
 ** 참고 사이트
 
 + [[https://github.com/nicola-lunghi/hiper-midicaptain?tab=readme-ov-file][hiper-midicaptain]] :: MidiCatain Customizing 출발점으로 좋은 사이트
   - Midi-Captain Spec 소개
   - Mu Editor를 사용한 Adafruit PySwitch Customizing 방법 소개
+
+** 설치 방법
+Paint Audio MIDI Captain (STD 10-switch 모델) 기준. 참고: [[https://github.com/nicola-lunghi/hiper-midicaptain][hiper-midicaptain]]
+
+*** 1. USB Update Mode 진입
+미디캡틴은 평상시 부팅에서는 USB 드라이브가 비활성화되어 있다 (기기가 config.json을 저장할 수 있도록 내부 파일시스템을 쓰기 가능 상태로 유지하기 위함 — boot.py 참고).
+
+1. USB 케이블로 미디캡틴과 컴퓨터를 연결
+2. *Switch 1 (왼쪽 위 풋스위치, GP1)을 누른 채* 전원을 켠다
+3. 컴퓨터에 =MIDICAPTAIN= 이라는 USB 드라이브가 나타남
+
+*** 2. 순정 펌웨어 백업 (최초 1회, 필수)
+설치 전 =MIDICAPTAIN= 드라이브의 *전체 내용을 컴퓨터에 복사*해 둔다.
+- 특히 =code.py=, =boot.py=, =lib/= 폴더
+- 문제 발생 시 백업 파일을 다시 복사하면 순정 상태로 복원된다
+
+*** 3. 프로젝트 파일 복사
+이 저장소의 다음 파일들을 =MIDICAPTAIN= 드라이브 루트에 덮어쓴다.
+
+| 파일         | 용도                                        |
+|--------------+---------------------------------------------|
+| =code.py=    | 메인 펌웨어 (FM3/FM9 양방향 SysEx 컨트롤러) |
+| =boot.py=    | 부팅 모드 제어 (Switch 1 → USB 드라이브)    |
+
+필요 라이브러리(=lib/= 폴더): =adafruit_midi=, =adafruit_st7789=, =adafruit_display_text=
+- 순정 펌웨어의 =lib/= 폴더에 이미 포함되어 있으므로 보통 그대로 사용하면 된다
+- 없거나 손상된 경우 아래 [[*CircuitPython libs][CircuitPython libs]] 절 참고하여 bundle 7.x에서 추출해 복사
+
+*** 4. 재부팅
+1. USB 드라이브를 안전하게 추출 (eject)
+2. 전원을 껐다가 (스위치를 누르지 않고) 다시 켠다
+3. Welcome 화면과 LED 테스트 후 FM3 컨트롤러 모드로 동작
+
+*** 5. 설정 변경
+- 로터리 휠을 *1초 이상 길게 누르면* Edit Mode 진입 — 각 스위치의 기능(effect, scene, tap tempo, tuner 등)과 LED 색상을 기기에서 직접 편집
+- 설정은 기기 내부 =config.json= 에 자동 저장됨
+- 코드를 수정하려면 다시 1번의 Update Mode로 진입
+
+*** 문제 해결
+- 드라이브가 안 보일 때 :: 데이터 전송 지원 USB 케이블인지 확인 후, Switch 1을 누른 상태로 전원 on을 다시 시도
+- 순정 복원 :: Update Mode 진입 후 백업해 둔 파일을 전부 덮어쓰기
+- 개발/디버깅 :: [[file:doc/mu.org][Mu Editor 사용법]] 참고. autoreload가 기본 활성화되어 있어 =code.py= 저장 즉시 반영된다 (끄려면 =boot.py= 의 =supervisor.disable_autoreload()= 주석 해제)
 
 ** CircuitPython libs
 Midicaptaion CPU board에는 CircuitPython이 내장되어 있다.

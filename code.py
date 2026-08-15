@@ -26,10 +26,17 @@ SET_CHANNEL = 0x0B
 SET_SCENE = 0x0C
 QUERY_PATCH_NAME = 0x0D
 QUERY_SCENE_NAME = 0x0E
+LOOPER_FUNC = 0x0F
 TAP_TEMPO_FUNC = 0x10
 TUNER_FUNC = 0x11
 STATUS_DUMP = 0x13
 SET_GET_TEMPO = 0x14
+
+# Looper (SysEx 0x0F) — 버튼 값 0-5, 상태는 비트마스크로 수신
+# state bits: 0=Record 1=Play 2=Overdub 3=Once 4=Reverse 5=Half-speed
+LOOPER_BTN_NAMES = ("REC", "PLAY", "UNDO", "ONCE", "REV", "HALF")
+# 버튼별 LED 점등 조건 마스크 (REC은 record|overdub, UNDO는 상태 없음 → 항상 점등)
+LOOPER_LED_MASKS = (0x05, 0x02, 0x00, 0x08, 0x10, 0x20)
 
 # Effect IDs
 EFFECT_IDS = {
@@ -108,78 +115,73 @@ NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 # ============================================================
 # Default Button Configuration
 # ============================================================
-DEFAULT_CONFIG = [
-    # switch1: scene 1 short / scene 5 long
-    {
-        "short": {"type": "scene", "number": 1},
-        "long": {"type": "scene", "number": 5},
-        "color_short": [255, 0, 0],
-        "color_long": [0, 255, 0],
-    },
-    # switch2: scene 2 / scene 6
-    {
-        "short": {"type": "scene", "number": 2},
-        "long": {"type": "scene", "number": 6},
-        "color_short": [255, 0, 0],
-        "color_long": [0, 255, 0],
-    },
-    # switch3: scene 3 / scene 7
-    {
-        "short": {"type": "scene", "number": 3},
-        "long": {"type": "scene", "number": 7},
-        "color_short": [255, 0, 0],
-        "color_long": [0, 255, 0],
-    },
-    # switch4: scene 4 / scene 8
-    {
-        "short": {"type": "scene", "number": 4},
-        "long": {"type": "scene", "number": 8},
-        "color_short": [255, 0, 0],
-        "color_long": [0, 255, 0],
-    },
-    # switchUp: preset_inc / preset_dec
-    {
-        "short": {"type": "preset_inc"},
-        "long": {"type": "preset_dec"},
-        "color_short": [0, 0, 255],
-        "color_long": [0, 0, 255],
-    },
-    # switchA: comp1 toggle
-    {
-        "short": {"type": "effect", "effect": "COMP1"},
-        "long": {"type": "none"},
-        "color_short": [255, 255, 0],
-        "color_long": [0, 0, 0],
-    },
-    # switchB: drive1 toggle / channel rotation
-    {
-        "short": {"type": "effect", "effect": "DRIVE1"},
-        "long": {"type": "channel_rotation", "effect": "DRIVE1"},
-        "color_short": [255, 128, 0],
-        "color_long": [0, 0, 0],
-    },
-    # switchC: chorus1 toggle
-    {
-        "short": {"type": "effect", "effect": "CHORUS1"},
-        "long": {"type": "none"},
-        "color_short": [0, 204, 204],
-        "color_long": [0, 0, 0],
-    },
-    # switchD: delay1 toggle
-    {
-        "short": {"type": "effect", "effect": "DELAY1"},
-        "long": {"type": "none"},
-        "color_short": [0, 0, 255],
-        "color_long": [0, 0, 0],
-    },
-    # switchDown: tap tempo / tuner
-    {
-        "short": {"type": "tap_tempo"},
-        "long": {"type": "tuner"},
-        "color_short": [0, 0, 255],
-        "color_long": [0, 0, 255],
-    },
-]
+def _btn(short, long_, c_short, c_long):
+    return {"short": short, "long": long_,
+            "color_short": list(c_short), "color_long": list(c_long)}
+
+
+def _fx(name):
+    return {"type": "effect", "effect": name}
+
+
+def _looper(btn):
+    return {"type": "looper", "button": btn}  # 0=REC 1=PLAY 2=UNDO 3=ONCE 4=REV 5=HALF
+
+
+def default_pages():
+    """호출 시마다 새 객체 생성 (공유 참조 방지)"""
+    none_a = {"type": "none"}
+    black = [0, 0, 0]
+    # Page 1: effects block on/off
+    fx_page = [
+        _btn(_fx("COMP1"), dict(none_a), [255, 255, 0], black),
+        _btn(_fx("DRIVE1"), {"type": "channel_rotation", "effect": "DRIVE1"},
+             [255, 128, 0], black),
+        _btn(_fx("CHORUS1"), dict(none_a), [0, 204, 204], black),
+        _btn(_fx("DELAY1"), dict(none_a), [0, 0, 255], black),
+        _btn({"type": "preset_inc"}, {"type": "preset_dec"}, [0, 0, 255], [0, 0, 255]),
+        _btn(_fx("REVERB1"), dict(none_a), [128, 0, 255], black),
+        _btn(_fx("FLANGER1"), dict(none_a), [255, 0, 255], black),
+        _btn(_fx("PHASER1"), dict(none_a), [0, 255, 128], black),
+        _btn(_fx("TREMOLO1"), dict(none_a), [0, 128, 255], black),
+        _btn({"type": "tap_tempo"}, {"type": "tuner"}, [0, 0, 255], [0, 0, 255]),
+    ]
+    # Page 2: scene & preset change
+    scene_page = [
+        _btn({"type": "scene", "number": 1}, {"type": "scene", "number": 5},
+             [255, 0, 0], [0, 255, 0]),
+        _btn({"type": "scene", "number": 2}, {"type": "scene", "number": 6},
+             [255, 0, 0], [0, 255, 0]),
+        _btn({"type": "scene", "number": 3}, {"type": "scene", "number": 7},
+             [255, 0, 0], [0, 255, 0]),
+        _btn({"type": "scene", "number": 4}, {"type": "scene", "number": 8},
+             [255, 0, 0], [0, 255, 0]),
+        _btn({"type": "preset_inc"}, {"type": "preset_dec"}, [0, 0, 255], [0, 0, 255]),
+        _btn({"type": "scene", "number": 5}, dict(none_a), [0, 255, 0], black),
+        _btn({"type": "scene", "number": 6}, dict(none_a), [0, 255, 0], black),
+        _btn({"type": "scene", "number": 7}, dict(none_a), [0, 255, 0], black),
+        _btn({"type": "scene", "number": 8}, dict(none_a), [0, 255, 0], black),
+        _btn({"type": "tap_tempo"}, {"type": "tuner"}, [0, 0, 255], [0, 0, 255]),
+    ]
+    # Page 3: looper (SysEx 0x0F)
+    looper_page = [
+        _btn(_looper(0), dict(none_a), [255, 0, 0], black),      # REC
+        _btn(_looper(1), dict(none_a), [0, 255, 0], black),      # PLAY
+        _btn(_looper(3), dict(none_a), [255, 255, 0], black),    # ONCE
+        _btn(_looper(2), dict(none_a), [200, 200, 200], black),  # UNDO
+        _btn({"type": "preset_inc"}, {"type": "preset_dec"}, [0, 0, 255], [0, 0, 255]),
+        _btn(_looper(4), dict(none_a), [0, 204, 204], black),    # REV
+        _btn(_looper(5), dict(none_a), [255, 128, 0], black),    # HALF
+        _btn(_fx("LOOPER1"), dict(none_a), [128, 0, 255], black),  # looper block on/off
+        _btn(dict(none_a), dict(none_a), black, black),
+        _btn({"type": "tap_tempo"}, {"type": "tuner"}, [0, 0, 255], [0, 0, 255]),
+    ]
+    return {"pages": [
+        {"name": "FX", "buttons": fx_page},
+        {"name": "SCENE", "buttons": scene_page},
+        {"name": "LOOPER", "buttons": looper_page},
+    ]}
+
 
 CONFIG_FILE = "config.json"
 
@@ -188,11 +190,21 @@ def load_config():
     try:
         with open(CONFIG_FILE, "r") as f:
             cfg = json.load(f)
-        if isinstance(cfg, list) and len(cfg) == NUM_BUTTONS:
-            return cfg
-    except (OSError, ValueError):
+        # v2: {"pages": [{"name":..., "buttons": [10개 버튼]}, ...]}
+        if isinstance(cfg, dict):
+            pages = cfg.get("pages")
+            if (isinstance(pages, list) and pages and
+                    all(isinstance(p, dict) and
+                        isinstance(p.get("buttons"), list) and
+                        len(p["buttons"]) == NUM_BUTTONS for p in pages)):
+                return cfg
+        # v1(단일 리스트) → v2 마이그레이션: 기존 설정을 page 1로 유지
+        elif isinstance(cfg, list) and len(cfg) == NUM_BUTTONS:
+            defaults = default_pages()
+            return {"pages": [{"name": "MAIN", "buttons": cfg}] + defaults["pages"][1:]}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
         pass
-    return [dict(d) for d in DEFAULT_CONFIG]
+    return default_pages()
 
 
 def save_config(cfg):
@@ -253,17 +265,28 @@ class LEDManager:
         self.num_buttons = num_pixels // LEDS_PER_BUTTON
         # Per-button: [LED1_color, LED2_color, LED3_color]
         self.button_leds = [[(0, 0, 0)] * LEDS_PER_BUTTON for _ in range(self.num_buttons)]
+        self.dirty = True
 
     def set_button_color(self, btn_idx, color):
         if 0 <= btn_idx < self.num_buttons:
             c = tuple(color)
-            self.button_leds[btn_idx] = [c, c, c]
+            new = [c, c, c]
+            if self.button_leds[btn_idx] != new:
+                self.button_leds[btn_idx] = new
+                self.dirty = True
 
     def set_button_leds(self, btn_idx, led1, led2, led3):
         if 0 <= btn_idx < self.num_buttons:
-            self.button_leds[btn_idx] = [tuple(led1), tuple(led2), tuple(led3)]
+            new = [tuple(led1), tuple(led2), tuple(led3)]
+            if self.button_leds[btn_idx] != new:
+                self.button_leds[btn_idx] = new
+                self.dirty = True
 
     def update(self):
+        # 변경이 없으면 pixels 재구성/전송 생략 (메인 루프 반응성)
+        if not self.dirty:
+            return
+        self.dirty = False
         for btn in range(self.num_buttons):
             base = btn * LEDS_PER_BUTTON
             leds = self.button_leds[btn]
@@ -285,13 +308,17 @@ class LEDManager:
 # ============================================================
 class FM3Controller:
     def __init__(self):
-        self.config = load_config()
+        self.full_config = load_config()
+        self.pages = self.full_config["pages"]
+        self.page_idx = 0
+        self.config = self.pages[0]["buttons"]  # 현재 페이지의 버튼 10개
         self.long_press_time = 0.5  # seconds
 
         # MIDI setup
         self.uart = busio.UART(
             tx=board.GP16, rx=board.GP17,
-            baudrate=31250, timeout=0.02
+            baudrate=31250, timeout=0.001,
+            receiver_buffer_size=2048,  # display.refresh() 등 수백 ms 정지에도 유실 방지
         )
         self.midi = adafruit_midi.MIDI(
             midi_in=self.uart, midi_out=self.uart,
@@ -338,8 +365,13 @@ class FM3Controller:
         self.fx_num_channels = {} # fx_id → supported channel count
         self.current_scene = None
         self.patch_name = ""
+        self.patch_number = None
         self.scene_name = ""
         self.tempo_bpm = 120
+        self.looper_state = 0   # SysEx 0x0F 비트마스크
+        self.name_query_at = 0  # preset 변경 직후 이름 조회 예약 시각
+        self._dump_sig = None   # status_dump 블록 구성 시그니처 (preset 변경 감지용)
+        self.rx_buf = b""       # 자체 SysEx 프레임 파서 수신 버퍼
 
         # Polling — round-robin, 한 루프에 하나만 전송
         self.poll_timer = 0
@@ -378,9 +410,10 @@ class FM3Controller:
         self._init_display_groups()
 
     def _build_lookups(self):
-        self.fx_to_btn = {}      # fx_id → list of button indices
-        self.scene_buttons = []  # button indices with scene type
-        self.tap_buttons = []    # button indices with tap_tempo type
+        self.fx_to_btn = {}       # fx_id → list of button indices
+        self.scene_buttons = []   # button indices with scene type
+        self.tap_buttons = []     # button indices with tap_tempo type
+        self.looper_buttons = []  # button indices with looper type
         for i, cfg in enumerate(self.config):
             for press in ("short", "long"):
                 action = cfg.get(press, {})
@@ -399,6 +432,25 @@ class FM3Controller:
                 elif atype == "tap_tempo":
                     if i not in self.tap_buttons:
                         self.tap_buttons.append(i)
+                elif atype == "looper":
+                    if i not in self.looper_buttons:
+                        self.looper_buttons.append(i)
+
+    # --------------------------------------------------------
+    # Page switching
+    # --------------------------------------------------------
+    def _change_page(self, delta):
+        n = len(self.pages)
+        if n <= 1:
+            return
+        self.page_idx = (self.page_idx + delta) % n
+        page = self.pages[self.page_idx]
+        self.config = page["buttons"]
+        self._build_lookups()
+        self._update_all_button_leds()
+        if self.looper_buttons:
+            self.send_get_looper()
+        self._show_temp(page.get("name", ""), "PAGE %d" % (self.page_idx + 1))
 
     # --------------------------------------------------------
     # Display 초기화 — 객체를 한 번만 생성
@@ -591,6 +643,12 @@ class FM3Controller:
     def send_get_tempo(self):
         self._send_sysex([FM3_MODEL_ID, SET_GET_TEMPO, 0x7F, 0x7F])
 
+    def send_looper_button(self, btn):
+        self._send_sysex([FM3_MODEL_ID, LOOPER_FUNC, btn])
+
+    def send_get_looper(self):
+        self._send_sysex([FM3_MODEL_ID, LOOPER_FUNC, 0x7F])
+
     def send_patch_inc(self):
         self.midi.send(ControlChange(41, 127))
 
@@ -601,19 +659,50 @@ class FM3Controller:
     # MIDI receive processing
     # --------------------------------------------------------
     def process_midi_in(self):
-        msg = self.midi.receive()
-        if not isinstance(msg, SystemExclusive):
+        # 자체 SysEx 프레임 파서 — adafruit_midi.receive()는 in_buf보다 큰
+        # SysEx(status_dump 등)를 완성하지 못해 뒤따르는 응답까지 유실시킴.
+        # UART에서 직접 읽어 F0...F7 프레임을 추출한다 (송신은 adafruit_midi 유지).
+        chunk = self.uart.read(256)
+        if chunk:
+            self.rx_buf += chunk
+        buf = self.rx_buf
+        if not buf:
             return
+        while True:
+            start = buf.find(b'\xf0')
+            if start < 0:
+                buf = b''  # sysex 시작 없음 → realtime 등 잔여 바이트 폐기
+                break
+            end = buf.find(b'\xf7', start + 1)
+            if end < 0:
+                if start > 0:
+                    buf = buf[start:]  # 프레임 앞 잡음 제거, 완성 대기
+                if len(buf) > 1024:
+                    buf = b''  # F7 유실로 비정상 성장 시 리셋
+                break
+            frame = buf[start + 1:end]  # F0/F7 제외
+            buf = buf[end + 1:]
+            self._handle_frame(frame)
+        self.rx_buf = buf
 
-        data = msg.data
+    def _handle_frame(self, frame):
+        # frame: mfr_id(3) + model + func + payload... + checksum
+        if len(frame) < 5:
+            return
+        if frame[0] != 0x00 or frame[1] != 0x01 or frame[2] != 0x74:
+            return
+        self._handle_sysex(frame[3:])
+
+    def _handle_sysex(self, data):
         if len(data) < 2 or data[0] != FM3_MODEL_ID:
             return
 
         func = data[1]
 
         if func == TAP_TEMPO_FUNC:
+            # 매 박자 push → LED 동기화만. display_dirty 금지
+            # (매 박자 refresh는 루프를 세워 SysEx 응답 유실을 유발)
             self.tap.on_tap()
-            self.display_dirty = True
             return
 
         if func == STATUS_DUMP:
@@ -622,23 +711,37 @@ class FM3Controller:
 
         if func == SET_SCENE:
             if len(data) >= 3:
-                self.current_scene = data[2]
-                self._update_scene_leds()
-                self.display_dirty = True
+                new_scene = data[2]
+                if new_scene != self.current_scene:
+                    self.current_scene = new_scene
+                    self._update_scene_leds()
+                    # scene 변경 감지 → 이름 즉시 조회
+                    self.send_query_scene_name()
+                    self.display_dirty = True
             return
 
         if func == QUERY_PATCH_NAME:
             if len(data) >= 36:
+                num = data[2] + data[3] * 128
                 name_bytes = data[4:36]
-                self.patch_name = "".join(chr(b) for b in name_bytes if 32 <= b < 127).strip()
-                self.display_dirty = True
+                name = "".join(chr(b) for b in name_bytes if 32 <= b < 127).strip()
+                if name != self.patch_name:
+                    self.patch_name = name
+                    self.display_dirty = True
+                if num != self.patch_number:
+                    self.patch_number = num
+                    # preset 변경 감지 → scene 이름/번호도 즉시 갱신
+                    self.send_get_scene()
+                    self.send_query_scene_name()
             return
 
         if func == QUERY_SCENE_NAME:
             if len(data) >= 35:
                 name_bytes = data[3:35]
-                self.scene_name = "".join(chr(b) for b in name_bytes if 32 <= b < 127).strip()
-                self.display_dirty = True
+                name = "".join(chr(b) for b in name_bytes if 32 <= b < 127).strip()
+                if name != self.scene_name:
+                    self.scene_name = name
+                    self.display_dirty = True
             return
 
         if func == TUNER_FUNC:
@@ -658,11 +761,20 @@ class FM3Controller:
 
         if func == SET_GET_TEMPO:
             if len(data) >= 4:
-                lo = data[2]
-                hi = data[3]
-                self.tempo_bpm = lo + hi * 128
-                self.tap.interval = 60.0 / self.tempo_bpm if self.tempo_bpm > 0 else 0.5
-                self.display_dirty = True
+                new_bpm = data[2] + data[3] * 128
+                if new_bpm != self.tempo_bpm:
+                    self.tempo_bpm = new_bpm
+                    self.tap.interval = 60.0 / new_bpm if new_bpm > 0 else 0.5
+                    self.display_dirty = True
+            return
+
+        if func == LOOPER_FUNC:
+            if len(data) >= 3:
+                new_state = data[2]
+                if new_state != self.looper_state:
+                    self.looper_state = new_state
+                    for i in self.looper_buttons:
+                        self._update_button_leds(i)
             return
 
         if func == SET_CHANNEL:
@@ -696,6 +808,13 @@ class FM3Controller:
             self.fx_num_channels[fx_id] = num_ch
         # 프리셋이 바뀌었으므로 모든 버튼 LED 일괄 갱신
         self._update_all_button_leds()
+        # 블록 구성 변화 = preset 변경 신호 → 이름 즉시 조회 예약
+        # (0.6초 폴링 로테이션보다 훨씬 빠른 0.15초 주기 감지)
+        sig = len(self.fx_states) * 100000 + sum(self.fx_states)
+        if sig != self._dump_sig:
+            if self._dump_sig is not None and not self.name_query_at:
+                self.name_query_at = time.monotonic() + 0.3
+            self._dump_sig = sig
 
     # --------------------------------------------------------
     # Button handling
@@ -770,6 +889,13 @@ class FM3Controller:
             self._update_channel_leds(fx_id)
             self._show_temp(fx_name, "CH.%s" % chr(65 + new_ch))
 
+        elif atype == "looper":
+            btn = action.get("button", 0)
+            self.send_looper_button(btn)
+            self.send_get_looper()  # 새 상태 즉시 조회 → LED 갱신
+            name = LOOPER_BTN_NAMES[btn] if btn < len(LOOPER_BTN_NAMES) else "?"
+            self._show_temp("LOOPER", name)
+
         elif atype == "tuner":
             self.tuner_active = not self.tuner_active
             self.send_tuner(self.tuner_active)
@@ -779,11 +905,14 @@ class FM3Controller:
             self.send_patch_inc()
             self._show_temp("PRESET", "+")
             self._blink_button(idx)
+            # FM3 프리셋 로딩 후 이름 즉시 조회 예약
+            self.name_query_at = time.monotonic() + 0.4
 
         elif atype == "preset_dec":
             self.send_patch_dec()
             self._show_temp("PRESET", "-")
             self._blink_button(idx)
+            self.name_query_at = time.monotonic() + 0.4
 
     def _blink_button(self, idx):
         cfg = self.config[idx]
@@ -829,7 +958,7 @@ class FM3Controller:
                 return
 
         # Two Type A (short=A1, long=A2)
-        if s_type in ("effect", "scene") and l_type in ("effect", "scene"):
+        if s_type in ("effect", "scene", "looper") and l_type in ("effect", "scene", "looper"):
             c1 = self._get_action_color(idx, "short")
             c2 = self._get_action_color(idx, "long")
             avg = color_avg(c1, c2)
@@ -837,19 +966,19 @@ class FM3Controller:
             return
 
         # Single action
-        if s_type in ("effect", "scene") and l_type == "none":
+        if s_type in ("effect", "scene", "looper") and l_type == "none":
             color = self._get_action_color(idx, "short")
             self.leds.set_button_color(idx, color)
             return
 
         # Type A + Type C
-        if s_type in ("effect", "scene") and l_type in ("tuner", "preset_inc", "preset_dec"):
+        if s_type in ("effect", "scene", "looper") and l_type in ("tuner", "preset_inc", "preset_dec"):
             color = self._get_action_color(idx, "short")
             self.leds.set_button_color(idx, color)
             return
 
         # Type C + Type A
-        if s_type in ("tuner", "preset_inc", "preset_dec") and l_type in ("effect", "scene"):
+        if s_type in ("tuner", "preset_inc", "preset_dec") and l_type in ("effect", "scene", "looper"):
             color = self._get_action_color(idx, "long")
             self.leds.set_button_color(idx, color)
             return
@@ -879,6 +1008,13 @@ class FM3Controller:
             if self.current_scene == scene_num:
                 return color
             return color_off(color)
+
+        if atype == "looper":
+            btn = action.get("button", 0)
+            mask = LOOPER_LED_MASKS[btn] if btn < len(LOOPER_LED_MASKS) else 0
+            if mask == 0:
+                return color  # UNDO 등 상태 없는 버튼은 항상 점등
+            return color if (self.looper_state & mask) else color_off(color)
 
         return color_off(color)
 
@@ -954,6 +1090,9 @@ class FM3Controller:
         # Normal display (통합 레이아웃)
         if self.display_dirty:
             self.display_dirty = False
+            # (1) Page — "P1 FX"
+            page_name = self.pages[self.page_idx].get("name", "")[:6]
+            self._set_label(self.lbl_page, "P%d %s" % (self.page_idx + 1, page_name))
             # (1) BPM
             self._set_label(self.lbl_bpm, "BPM:%d" % self.tempo_bpm)
             # (2) Patch Name
@@ -981,8 +1120,8 @@ class FM3Controller:
     # --------------------------------------------------------
     # Edit mode (Rotary Encoder)
     # --------------------------------------------------------
-    EDIT_TYPES = ["effect", "scene", "tap_tempo", "tuner", "preset_inc", "preset_dec",
-                  "channel_rotation", "none"]
+    EDIT_TYPES = ["effect", "scene", "tap_tempo", "tuner", "looper",
+                  "preset_inc", "preset_dec", "channel_rotation", "none"]
     EFFECT_LIST = sorted(EFFECT_IDS.keys())
     EDIT_PARAMS = ["Type", "Target", "Color1", "Color2", "Color3", "Back"]
     BTN_ABBREV  = ("sw1", "sw2", "sw3", "sw4", "swUp", "swA", "swB", "swC", "swD", "swDn")
@@ -1011,6 +1150,8 @@ class FM3Controller:
             self.encoder_last_pos = pos
             if self.edit_mode:
                 self._edit_rotate(delta)
+            else:
+                self._change_page(delta)
 
     def _enter_edit_mode(self):
         self.edit_mode = True
@@ -1024,7 +1165,7 @@ class FM3Controller:
 
     def _exit_edit_mode(self):
         self.edit_mode = False
-        save_config(self.config)
+        save_config(self.full_config)
         self._build_lookups()
         self._update_all_button_leds()
         self.display_dirty = True
@@ -1144,6 +1285,9 @@ class FM3Controller:
         elif atype == "scene":
             cur = action.get("number", 1)
             action["number"] = max(1, min(8, cur + delta))
+        elif atype == "looper":
+            cur = action.get("button", 0)
+            action["button"] = (cur + delta) % len(LOOPER_BTN_NAMES)
 
     def _update_edit_display(self):
         if not self.display_dirty:
@@ -1162,7 +1306,7 @@ class FM3Controller:
 
     def _draw_edit_level0(self):
         # 5행 2열 그리드: 왼열(sw1~swUp) / 오른열(swA~swDn) — 셀 독립 하이라이트
-        self._set_label(self.lbl_edit_title, "[EDIT] Select SW")
+        self._set_label(self.lbl_edit_title, "[EDIT P%d] Sel SW" % (self.page_idx + 1))
         for row in range(5):
             li, ri = row, row + 5
             l_sel = (self.edit_btn_idx == li)
@@ -1234,6 +1378,9 @@ class FM3Controller:
                 return a.get("effect", "?")
             elif t == "scene":
                 return str(a.get("number", "?"))
+            elif t == "looper":
+                btn = a.get("button", 0)
+                return LOOPER_BTN_NAMES[btn] if btn < len(LOOPER_BTN_NAMES) else "?"
             return "-"
         elif item == "Color":
             c = cfg.get("color_" + press_type, [0, 0, 0])
@@ -1305,20 +1452,23 @@ class FM3Controller:
         self.poll_timer = now
         self.poll_count += 1
 
-        # 매번 status_dump, 3번째마다 get_scene/get_tempo, 13번째마다 patch/scene name
-        self.send_status_dump()
+        # 매 틱(0.15s): scene 조회 (응답 ~10B, 즉각적인 scene 변경 감지)
+        # 3-슬롯 로테이션(0.45s 주기): status_dump / patch name / scene name+tempo
+        # status_dump 응답(~수백B, 전송 ~100ms)을 매 틱 요청하면 UART 대역폭이
+        # 포화되어 이름 응답이 밀리므로 0.45s로 낮춤
+        self.send_get_scene()
 
-        if self.poll_count % 3 == 0:
-            self.send_get_scene()
-
-        if self.poll_count % 3 == 1:
-            self.send_get_tempo()
-
-        if self.poll_count % 13 == 0:
+        slot = self.poll_count % 3
+        if slot == 0:
+            self.send_status_dump()
+        elif slot == 1:
             self.send_query_patch_name()
-
-        if self.poll_count % 13 == 7:
+        else:
             self.send_query_scene_name()
+            self.send_get_tempo()
+            # 현재 페이지에 looper 버튼이 있을 때만 상태 조회
+            if self.looper_buttons:
+                self.send_get_looper()
 
     # --------------------------------------------------------
     # Main loop
@@ -1326,28 +1476,38 @@ class FM3Controller:
     def run(self):
         print("FM3 Controller Started")
         self.show_welcome()
+        # welcome 동안(~1.5s) 쌓인 미수신 데이터 폐기 — 깨진 SysEx 조각 방지
+        self.uart.reset_input_buffer()
+        # 초기 상태 일괄 조회 (폴링 로테이션 대기 없이)
         self.send_status_dump()
         self.send_get_scene()
+        self.send_get_tempo()
+        self.send_query_patch_name()
+        self.send_query_scene_name()
         gc_count = 0
 
         while True:
             now = time.monotonic()
 
-            # 1. Buttons
-            self.process_buttons()
-
-            # 2. MIDI IN
-            self.process_midi_in()
-
-            # 3. Polling (round-robin)
-            self._do_polling(now)
-
-            # 4. Rotary encoder
+            # 1. Rotary encoder (반응성 우선 — 가장 먼저 처리)
             self.process_encoder()
 
-            # 5. Tap tempo LED update (경량: 직접 색상 설정만)
-            for i in self.tap_buttons:
-                self._update_tap_led(i)
+            # 2. Buttons
+            self.process_buttons()
+
+            # 3. MIDI IN
+            self.process_midi_in()
+
+            # 4. Polling / Tap LED — edit mode 중에는 생략
+            #    (status_dump 파싱이 루프를 수십 ms 지연시켜 로터리 반응성 저하)
+            if not self.edit_mode:
+                # preset 변경 직후 예약된 이름 조회 (폴링 로테이션 대기 없이)
+                if self.name_query_at and now >= self.name_query_at:
+                    self.name_query_at = 0
+                    self.send_query_patch_name()
+                self._do_polling(now)
+                for i in self.tap_buttons:
+                    self._update_tap_led(i)
 
             # 6. Tuner timeout
             if self.tuner_active and now - self.tuner_last_data > 5.0:
