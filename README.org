@@ -158,3 +158,44 @@ CircuitPython에 포함되지 않은 python package는
 
 ** Issues
 + effects block이 현재 scene에 없을 때 LED 완전히 off
+
+** 호환성 및 테스트 범위 (단서 조항)
+실제 테스트를 마친 조합은 *Fractal FM3 + Paint Audio MIDI Captain (10-switch STD)* 뿐입니다.
+
+*** Fractal 기기
+| 기기         | 상태            | 비고                                                                     |
+|--------------+-----------------+--------------------------------------------------------------------------|
+| FM3          | *테스트 완료*   | =FM3_MODEL_ID = 0x11= (기본값)                                            |
+| FM9          | 미테스트        | 동일 SysEx 프로토콜(Axe-Fx III 계열)이므로 원리상 동작 예상. model ID 0x12 |
+| Axe-Fx III   | 미테스트        | 상동. model ID 0x10                                                      |
+
+FM9/Axe-Fx III에서 사용하려면 code.py의 =FM3_MODEL_ID= 를 해당 기기의 SysEx model ID로 변경해야 합니다.
+기기별 model ID는 [[https://wiki.fractalaudio.com/wiki/index.php?title=MIDI_SysEx][Fractal Audio Wiki — MIDI SysEx]] 참고:
+
+| Model ID | 기기            |
+|----------+-----------------|
+| 0x00     | Axe-Fx Standard |
+| 0x01     | Axe-Fx Ultra    |
+| 0x02     | MFC-101         |
+| 0x03     | Axe-Fx II       |
+| 0x04     | MFC-101 mk3     |
+| 0x05     | FX8             |
+| 0x06     | Axe-Fx II XL    |
+| 0x07     | Axe-Fx II XL+   |
+| 0x08     | AX8             |
+| 0x0A     | FX8 mk2         |
+| 0x10     | Axe-Fx III      |
+| 0x11     | FM3             |
+| 0x12     | FM9             |
+| 0x14     | VP4             |
+| 0x15     | AM4             |
+
+(Axe-Fx II 이하 구세대 기기는 SysEx 명령 체계 자체가 달라 이 프로젝트와 호환되지 않습니다)
+
+*** MIDI Captain 모델
+| 모델                  | 상태          | 비고                                        |
+|-----------------------+---------------+---------------------------------------------|
+| STD (10-switch)       | *테스트 완료* |                                             |
+| ONE / DUO / NANO 4 / MINI 6 | *호환 불가* | Rotary wheel 또는 LED Screen이 없어 페이지 전환·Edit Mode·상태 표시가 불가능 |
+
+FM9/Axe-Fx III에서 동작을 확인하신 분은 issue로 알려주시면 반영하겠습니다.
