@@ -4,6 +4,16 @@
 FM3, FM9등 Fractal Audio Systems 제품 특화된 Midi-Captain Customizing
 양방향 통신을 사용해서 Effects Block의 on/off변화를 미디 캡틴과 동기화
 
+[[file:demo.gif]]
+
+** ⚠ Disclaimer (면책 조항)
+이 프로젝트는 Paint Audio MIDI Captain *상용 완제품의 펌웨어를 교체*하는 작업을 포함합니다.
+
+- 설치 전 *반드시 기존 순정 펌웨어 전체를 백업*하십시오 (아래 [[*2. 순정 펌웨어 백업 (최초 1회, 필수)][설치 방법 2단계]] 참고). 백업이 없으면 순정 상태로 복원할 수 없습니다.
+- 펌웨어 교체는 제조사 보증(warranty)을 무효화할 수 있습니다.
+- 이 펌웨어를 설치·사용함으로써 발생하는 기기 오작동, 손상, 데이터 손실 등 *모든 결과에 대한 책임은 전적으로 사용자 본인에게 있습니다*.
+- 이 프로젝트는 Paint Audio 및 Fractal Audio Systems와 무관한 개인 프로젝트이며, 어떠한 보증도 제공하지 않습니다 (NO WARRANTY).
+
 ** 프로젝트 목적
 
 *** Pain Point
