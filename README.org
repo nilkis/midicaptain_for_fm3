@@ -36,6 +36,19 @@ SysEx 미디 프로토콜(Fractal FM3/FM9 등에서 지원)을 사용한 *양방
 ** 설치 방법
 Paint Audio MIDI Captain (STD 10-switch 모델) 기준. 참고: [[https://github.com/nicola-lunghi/hiper-midicaptain][hiper-midicaptain]]
 
+*** 0. MIDI 케이블 연결 — 양방향 (케이블 2개 필수)
+이 펌웨어는 SysEx로 FM3의 상태를 *조회하고 응답을 받는* 양방향 통신을 사용하므로,
+일반적인 미디 컨트롤러처럼 케이블 1개(MIDI OUT → IN)만 연결하면 동작하지 않습니다.
+반드시 *5핀 MIDI 케이블 2개*로 양방향을 모두 연결하십시오.
+
+| MIDI Captain | 방향 | FM3      | 용도                                        |
+|--------------+------+----------+---------------------------------------------|
+| MIDI OUT     | →    | MIDI IN  | 명령/조회 전송 (scene, effect, tap, 조회 등) |
+| MIDI IN      | ←    | MIDI OUT | 상태 응답 수신 (effect 상태, 이름, BPM 등)  |
+
+- FM3 쪽 MIDI OUT 포트가 *THRU*로 설정되어 있으면 응답이 나오지 않습니다. FM3 =SETUP > MIDI/Remote= 에서 MIDI OUT 모드를 확인하십시오.
+- 케이블 1개만 연결된 경우 증상: 스위치로 제어는 되지만 LED/화면이 FM3 상태를 따라오지 않고 프리셋/씬 이름이 =---= 로 남습니다.
+
 *** 1. USB Update Mode 진입
 미디캡틴은 평상시 부팅에서는 USB 드라이브가 비활성화되어 있다 (기기가 config.json을 저장할 수 있도록 내부 파일시스템을 쓰기 가능 상태로 유지하기 위함 — boot.py 참고).
 
