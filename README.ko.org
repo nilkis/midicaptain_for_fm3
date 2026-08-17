@@ -1,6 +1,7 @@
 #+title: Readme
 
 * Midi-Captain for FM3
+*Paint Audio MIDI Captain* + *Fractal Audio FM3* 양방향 펌웨어
 
 /[[file:README.org][English]] | 한국어/
 
