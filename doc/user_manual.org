@@ -1,0 +1,246 @@
+#+title: MIDI Captain for Fractal — 사용자 매뉴얼
+#+options: toc:3
+
+설치 방법은 [[file:../README.org][README]]를 참고하세요. 이 문서는 설치 후 *사용법*을 다룹니다.
+
+* 1. 개요
+MIDI Captain(10-switch)을 Fractal FM3의 양방향 컨트롤러로 사용합니다.
+FM3의 상태(effects on/off, 채널, scene, preset/scene 이름, BPM, looper)를 SysEx로 읽어
+LED와 화면에 실시간 반영합니다.
+
+** 조작부
+| 부품            | 역할                                                    |
+|-----------------+---------------------------------------------------------|
+| 풋스위치 10개   | 각 스위치에 Press(짧게) / Hold(길게) 동작을 할당         |
+| 로터리 휠 회전  | 페이지 전환 (Edit Mode에서는 메뉴 이동/값 변경)          |
+| 로터리 휠 클릭  | Edit Mode에서 선택/확정                                 |
+| 로터리 휠 길게  | Edit Mode 진입 / 한 단계 뒤로 / (MAIN에서) 저장 후 종료  |
+| 화면 (240x240)  | 상태 표시 및 Edit Mode 메뉴                             |
+
+** 스위치 배치
+|---+---+---+---+----|
+| 1 | 2 | 3 | 4 | UP |
+|---+---+---+---+----|
+| A | B | C | D | DN |
+|---+---+---+---+----|
+
+* 2. 화면 (Normal Mode)
+|-------------------------------|
+| P2 FX               BPM:120   |  ← 현재 페이지 번호/이름, FM3 템포
+|-------------------------------|
+|         Preset Name           |  ← FM3 현재 preset 이름 (13자 초과 시 자동 축소, 최대 20자)
+|         Scene Name            |  ← 현재 scene 이름
+|                               |
+|          DRIVE1               |  ← 방금 실행한 동작 (1.5초간 표시)
+|            ON                 |
+|-------------------------------|
+
+- 스위치를 밟으면 하단에 동작 내용이 잠시 표시됩니다 (예: =DRIVE1 / ON=, =SCENE / 3=, =PAGE 2 / FX=)
+- Tuner가 켜지면 화면이 TUNER 화면으로 바뀝니다 (FM3 =Send Realtime SysEx= 가 ON이면 음/센트 표시,
+  OFF면 안내 문구만 표시되며 FM3 본체 화면을 보세요)
+
+* 3. 페이지 (Page)
+페이지는 10개 스위치의 기능 세트입니다. 총 8페이지가 있고 로터리 휠 회전으로 전환합니다.
+스위치의 Hold에 =page_inc= / =page_dec= 를 할당해 발로도 전환할 수 있습니다 (기본 Up/Dn Hold).
+
+** 기본 페이지 구성
+*** P1 SCENE
+| SW | Press          | Hold  |
+|----+----------------+-------|
+| 1~4 | Scene 1~4     | -     |
+| A~D | Scene 5~8     | -     |
+| Up  | Preset +      | Page + |
+| Dn  | Preset -      | Page - |
+
+*** P2 FX (Effects on/off)
+| SW | Press           | Hold          |
+|----+-----------------+---------------|
+| 1  | CHORUS1         | -             |
+| 2  | PHASER1         | -             |
+| 3  | FLANGER1        | -             |
+| 4  | Tap Tempo       | Tuner         |
+| A  | COMP1           | -             |
+| B  | DRIVE1          | 채널 회전 (A→B→C→D) |
+| C  | PARAEQ1         | -             |
+| D  | DELAY1          | 채널 회전     |
+| Up | Preset +        | Page +        |
+| Dn | Preset -        | Page -        |
+
+*** P3 AMP (Amp 채널 선택)
+| SW | Press           | Hold      |
+|----+-----------------+-----------|
+| 1  | COMP1           | -         |
+| 2  | DRIVE1          | 채널 회전 |
+| 3  | PARAEQ1         | -         |
+| 4  | DELAY1          | 채널 회전 |
+| A~D | AMP1 채널 A/B/C/D 선택 | - |
+| Up/Dn | Preset ± / Page ± |     |
+
+*** P4 LOOPER
+| SW | Press             | Hold  |
+|----+-------------------+-------|
+| 1  | Looper Reverse    | -     |
+| 2  | Looper Half-speed | -     |
+| 3  | LOOPER1 블록 on/off | -   |
+| 4  | Tap Tempo         | Tuner |
+| A  | Looper Play       | -     |
+| B  | Looper Record     | -     |
+| C  | Looper Undo       | -     |
+| D  | Looper Once       | -     |
+| Up/Dn | Preset ± / Page ± |   |
+
+*** P5~P8 USER1~4
+비어 있음 (Up/Dn만 기본 할당). 자유롭게 구성하세요.
+
+** 시작 페이지
+Global Settings의 =StartPg= 로 부팅 시 페이지를 정합니다.
+- =Last= (기본): 마지막으로 사용하던 페이지로 시작 (전환 후 3초 뒤 자동 저장)
+- =P1= ~ =P8=: 항상 해당 페이지로 시작 (라이브 등 예측 가능성이 필요할 때)
+
+* 4. 스위치 동작 (Function)
+각 스위치에는 Press와 Hold 두 동작을 따로 할당합니다.
+
+| Function          | 동작                                            | LED 표시                                  |
+|-------------------+-------------------------------------------------+-------------------------------------------|
+| effect            | 이펙트 블록 on/off 토글                          | on=밝게, off=어둡게, 프리셋에 없으면 꺼짐   |
+| effect + Rotate   | (Hold) 채널 A→B→C→D 순환                         | 현재 채널 색으로 표시                      |
+| channel_select    | 특정 이펙트의 채널을 지정 (예: AMP1 채널 B)       | 현재 채널이면 밝게, 아니면 어둡게          |
+| scene             | Scene 1~8 선택                                   | 현재 scene이면 밝게                        |
+| preset_inc / dec  | Preset +1 / -1                                   | 평소 어둡게, 밟는 순간 밝게                |
+| page_inc / dec    | 페이지 +1 / -1                                   | 평소 어둡게, 밟는 순간 밝게                |
+| tap_tempo         | 탭 템포 (밟는 즉시)                              | FM3 템포에 맞춰 점멸                       |
+| tuner             | Tuner on/off 토글                                | on이면 밝게                                |
+| looper            | Record/Play/Undo/Once/Reverse/Half-speed         | 아래 참조                                  |
+| none              | 없음                                             | 꺼짐                                       |
+
+** LED 색상 규칙
+- 각 동작에 12색 팔레트(FM3와 동일) 중 하나를 지정: Red, Orange, Yellow, Yellow-Green, Green, Teal, Cyan, Blue, Purple, Pink, White, Off
+- 스위치의 LED 3개를 각각 다른 색으로도 지정 가능
+- *Press* 동작의 색이 LED를 결정합니다. Hold 동작은 화면에만 표시 (Press가 none이면 Hold 색 사용)
+- 활성(on) = 지정 색, 비활성(off) = 같은 색을 아주 어둡게
+
+** Looper LED
+| 버튼       | LED                                              |
+|------------+--------------------------------------------------|
+| Record     | 녹음 중 = 지정색(기본 빨강), Overdub 중 = 2번째 색(기본 주황), 대기 = 어둡게 |
+| Play       | 재생 중 밝게                                     |
+| Undo       | 평소 어둡게, 밟는 순간 밝게                       |
+| Once/Rev/Half | 모드 ON이면 밝게                              |
+Looper 상태는 FM3에서 직접 조작해도 동기화됩니다. 프리셋에 Looper 블록이 없으면 명령이 무시됩니다.
+
+** Tap Tempo 특례
+Tap Tempo는 밟는 즉시 발화하므로 같은 스위치의 Hold에 다른 기능(예: Tuner)을 넣을 수 있습니다.
+
+* 5. Hold 판정
+Global Settings에서 조절합니다.
+- =HoldTime=: Press/Hold를 가르는 시간. 0.3~2.0초 (기본 0.5초)
+- =HoldAt=:
+  - =Release= (기본): 발을 뗄 때 판정. HoldTime 이상 눌렀으면 Hold
+  - =Timeout=: 누른 채 HoldTime이 지나는 순간 Hold 발동. 이후 떼도 아무 동작 없음.
+    Tuner처럼 "밟고 있으면 켜지는" 느낌을 원할 때
+
+* 6. Edit Mode — 스위치/설정 편집
+로터리 휠을 *1초 이상 길게 누르면* 진입합니다. 모든 편집은 기기에서 직접 하며 종료 시 자동 저장됩니다.
+
+** 기본 조작
+| 조작        | 동작                                                     |
+|-------------+----------------------------------------------------------|
+| 회전        | 커서 이동 / (편집 중) 값 변경                              |
+| 클릭        | 선택·진입 / (편집 중) 확정 또는 다음 단계                  |
+| 길게 누름   | 한 단계 뒤로. 값 편집 중이면 편집만 종료. MAIN에서는 저장 후 종료 |
+
+** 화면 구조
+#+begin_example
+MAIN
+ ├─ Switch  P2 FX      → 클릭 → 회전으로 페이지 선택 → 클릭 → Switch 테이블
+ │    ├─ (헤더) P2 FX  → 클릭 → 페이지 이름 편집
+ │    └─ 1 ~ Dn        → 클릭 → Press / Hold 선택 → 파라미터 편집
+ ├─ Global Settings    → HoldTime / HoldAt / StartPg
+ └─ Exit               → 저장 후 종료
+#+end_example
+
+** Switch 테이블
+#+begin_example
+ P2 FX     Press Hold
+ ────────────────────
+>1  CHORUS1   -
+ 2  PHASER1   -
+ 3  FLANGER1  -
+ 4  TapTmp    Tuner
+ Up Preset+   Page+
+ A  COMP1     -
+ B  DRIVE1    Rot
+ C  PARAEQ1   -
+ D  DELAY1    Rot
+ Dn Preset-   Page-
+#+end_example
+- 10개 스위치의 Press/Hold 요약이 한눈에 보입니다. =Rot= 는 채널 회전 sub-function
+- 커서를 올려둔 스위치의 실제 LED가 미리보기로 켜집니다 (현재 페이지 편집 시)
+- 맨 위 헤더 행에 커서를 두고 클릭하면 *페이지 이름*을 편집합니다
+
+** 페이지 이름 편집
+헤더 클릭 → =*P2 [F]X    = (노란색, [ ]가 편집 칸)
+- 회전 = 문자 변경 (공백 → A~Z → 0~9 → =- _ + . /=)
+- 클릭 = 다음 칸. 6번째 칸에서 클릭하면 확정
+- 길게 누름 = 즉시 확정
+- 최대 6자. 전부 공백이면 =P2= 같은 기본 이름
+
+** 파라미터 편집 (Press / Hold)
+스위치 → Press 또는 Hold 선택 → 항목 테이블
+| 항목    | 설명                                                        |
+|---------+-------------------------------------------------------------|
+| Type    | 기능 종류 (effect / channel_select / scene / looper / tap_tempo / tuner / preset_inc / preset_dec / page_inc / page_dec / none) |
+| Target  | effect 이름, scene 번호, looper 버튼 등                      |
+| Chan    | (channel_select) 채널 A~D                                    |
+| Color   | LED 색상 (아래 참조)                                         |
+| Rotate  | (effect, Press만) 채널 회전 sub-function ON/OFF              |
+| Chans   | (Rotate ON) 순환에 포함할 채널 선택                          |
+| Col.A~D | (Rotate ON) 채널별 색상                                      |
+| Col.OD  | (looper Record) Overdub 색상                                 |
+
+일반 항목: 클릭 → 편집(=*=) → 회전으로 값 변경 → 클릭으로 확정
+
+*** Color 편집
+색상 항목은 텍스트 대신 *색 견본*으로 표시되고, 발밑 LED에도 그 색이 바로 켜집니다.
+- 클릭 → 편집 시작 (대상 ALL = LED 3개 동시)
+- 회전 = 팔레트 색 순환
+- 클릭 = 대상 순환 ALL → L1 → L2 → L3 → *클릭 = 종료*
+  L1~L3에서 회전하면 해당 LED만 바뀝니다 (견본 3개 표시, 편집 중인 견본에 흰 테두리)
+- 길게 누름 = 즉시 종료
+
+*** Chans 편집 (Rotate ON일 때)
+=Chans  A B C D= — 순환에 포함할 채널. 제외된 채널은 =.= 로 표시
+- 클릭 → 편집 시작 =[A]B C D OK=
+- 회전 = 커서 이동 (A → B → C → D → OK)
+- 클릭 = 해당 채널 포함/제외 토글. =OK= 에서 클릭 = 종료
+- 최소 1채널은 유지됩니다
+
+** Global Settings
+| 항목     | 값                                  |
+|----------+-------------------------------------|
+| HoldTime | 0.3 ~ 2.0초 (0.1 단위)              |
+| HoldAt   | Release / Timeout                   |
+| StartPg  | Last / P1 ~ P8                      |
+클릭 → 편집 → 회전 → 클릭 확정. 길게 누름으로 MAIN 복귀.
+
+** 저장
+- Exit 선택 또는 MAIN에서 길게 누름 → =config.json= 에 저장 후 Normal Mode 복귀
+- 다른 페이지를 편집했어도 현재 페이지로 돌아옵니다
+- USB 드라이브 모드(Switch 1 누르고 부팅)에서는 파일시스템이 읽기 전용이라 저장되지 않습니다.
+  평상시 부팅에서 편집하세요
+
+* 7. FM3 쪽 설정
+- MIDI 케이블 2개로 양방향 연결 (README 참조)
+- =SETUP > MIDI/Remote= 에서 MIDI OUT이 THRU가 아닌지 확인
+- Tuner 음/센트를 미디캡틴 화면에 표시하려면 =Send Realtime SysEx= ON
+
+* 8. 문제 해결
+| 증상                                  | 확인                                                        |
+|---------------------------------------+-------------------------------------------------------------|
+| LED/이름이 FM3 상태를 안 따라옴        | MIDI IN 케이블(FM3 OUT → 미디캡틴 IN) 연결, FM3 MIDI OUT 모드 |
+| 특정 이펙트 LED가 완전히 꺼져 있음      | 현재 프리셋에 그 블록이 없음 (정상)                          |
+| Looper 버튼이 반응 없음               | 프리셋에 Looper 블록이 없음. P4의 =LOOPER1= LED로 확인         |
+| Tuner 화면에 음/센트가 안 나옴          | FM3 =Send Realtime SysEx= 를 ON                              |
+| Edit Mode에서 저장이 안 됨             | USB 드라이브 모드로 부팅됨 → 평상시 부팅으로 재시작           |
+| 부팅 시 설정이 초기화됨                | 구버전 config가 감지되어 기본값으로 교체됨 (설계상 마이그레이션 없음) |
+| 순정 펌웨어로 되돌리고 싶음            | README 설치 방법의 백업 파일 복원                            |

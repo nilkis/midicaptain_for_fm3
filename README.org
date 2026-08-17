@@ -164,6 +164,9 @@ CircuitPython에 포함되지 않은 python package는
   | Encoder A         | GP2  |
   | Encoder B         | GP3  |
   |-                  |      |
+** [[file:doc/user_manual.org][사용자 매뉴얼]]
+페이지/스위치 동작, LED 규칙, Edit Mode 조작법, Global Settings, 문제 해결
+
 ** [[file:doc/mu.org][Mu Editor 사용법]]
 ** Fractal Audio System SysEx Guide
 [[https://wiki.fractalaudio.com/wiki/index.php?title=MIDI_SysEx][On-line]]
