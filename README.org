@@ -107,6 +107,7 @@ MIDICAPTAIN/
 *** Troubleshooting
 - Drive doesn't appear :: Make sure the USB cable supports data; retry powering on with Switch 1 held
 - Restore stock :: Enter update mode and copy back all backed-up files
+- Settings don't save / =config.json= never appears after a normal boot :: The device's FAT filesystem may be corrupted (typically after many file deletions or an unsafe eject). Reformat it from the device and reinstall: enter update mode, open the serial console (e.g. Mu editor), press Ctrl-C to get a REPL, run =import storage; storage.erase_filesystem()= — the device reformats and reboots as a blank =CIRCUITPY= drive — then copy =code.py=, =boot.py=, =lib/= again (step 3). Your custom config is lost, so back up =config.json= first if you can.
 - Development / debugging :: Use the [[https://learn.adafruit.com/welcome-to-circuitpython/installing-mu-editor][Mu editor]] serial console (see also [[https://github.com/nicola-lunghi/hiper-midicaptain][hiper-midicaptain]]). Auto-reload is on by default, so saving =code.py= applies immediately (uncomment =supervisor.disable_autoreload()= in =boot.py= to disable)
 
 ** CircuitPython libs

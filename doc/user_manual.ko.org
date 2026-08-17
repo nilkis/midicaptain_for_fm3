@@ -245,4 +245,5 @@ MAIN
 | Tuner 화면에 음/센트가 안 나옴          | FM3 =Send Realtime SysEx= 를 ON                              |
 | Edit Mode에서 저장이 안 됨             | USB 드라이브 모드로 부팅됨 → 평상시 부팅으로 재시작           |
 | 부팅 시 설정이 초기화됨                | 구버전 config가 감지되어 기본값으로 교체됨 (설계상 마이그레이션 없음) |
+| 설정이 전혀 저장 안 됨, 평상시 부팅 후에도 =config.json= 없음 | 파일시스템 손상 가능성 — REPL에서 =storage.erase_filesystem()= 으로 포맷 후 재설치 (README 문제 해결 참고) |
 | 순정 펌웨어로 되돌리고 싶음            | README 설치 방법의 백업 파일 복원                            |

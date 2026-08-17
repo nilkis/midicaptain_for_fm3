@@ -245,4 +245,5 @@ Click → edit → turn → click to confirm. Hold to return to MAIN.
 | Tuner screen shows no note/cents           | turn on FM3 =Send Realtime SysEx=                                   |
 | Edit Mode changes aren't saved             | booted in USB-drive mode → reboot normally                          |
 | Settings reset on boot                     | an old-format config was detected and replaced with defaults (no migration by design) |
+| Settings never save; no =config.json= after normal boot | filesystem likely corrupted — reformat with =storage.erase_filesystem()= in the REPL and reinstall (see README troubleshooting) |
 | Want the stock firmware back               | restore the backup per the README install section                  |

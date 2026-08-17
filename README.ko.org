@@ -113,6 +113,7 @@ MIDICAPTAIN/
 *** 문제 해결
 - 드라이브가 안 보일 때 :: 데이터 전송 지원 USB 케이블인지 확인 후, Switch 1을 누른 상태로 전원 on을 다시 시도
 - 순정 복원 :: Update Mode 진입 후 백업해 둔 파일을 전부 덮어쓰기
+- 설정이 저장되지 않음 / 평상시 부팅 후에도 =config.json= 이 생기지 않음 :: 기기 FAT 파일시스템 손상 가능성 (파일 대량 삭제나 안전하지 않은 추출 뒤에 흔함). 기기에서 포맷 후 재설치: Update Mode 진입 → 시리얼 콘솔(Mu 등) 열기 → Ctrl-C로 REPL → =import storage; storage.erase_filesystem()= 실행 → 기기가 포맷 후 빈 =CIRCUITPY= 드라이브로 재부팅 → 3단계대로 =code.py=, =boot.py=, =lib/= 다시 복사. 사용자 설정은 사라지므로 가능하면 =config.json= 을 먼저 백업.
 - 개발/디버깅 :: [[https://learn.adafruit.com/welcome-to-circuitpython/installing-mu-editor][Mu Editor]] 시리얼 콘솔 사용 ([[https://github.com/nicola-lunghi/hiper-midicaptain][hiper-midicaptain]] 참고). autoreload가 기본 활성화되어 있어 =code.py= 저장 즉시 반영된다 (끄려면 =boot.py= 의 =supervisor.disable_autoreload()= 주석 해제)
 
 ** CircuitPython libs
