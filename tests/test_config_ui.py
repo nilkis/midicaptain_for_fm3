@@ -135,7 +135,7 @@ ctl.current_scene = None
 ctl.looper_state = 0
 ctl.tuner_active = False
 ctl.tap_flash_until = [0.0] * 10
-ctl.edit_redraw_at = 0; ctl.edit_mode = False; ctl.edit_btn_idx = 0; ctl.edit_screen = 0; ctl.edit_cursor = 0; ctl.edit_press_idx = 0; ctl.edit_page = 0; ctl.edit_editing_value = False; ctl.edit_led_idx = 3
+ctl.edit_redraw_at = 0; ctl.copy_dst = 0; ctl.press_times = {}; ctl.hold_fired = set(); ctl.edit_mode = False; ctl.edit_btn_idx = 0; ctl.edit_screen = 0; ctl.edit_cursor = 0; ctl.edit_press_idx = 0; ctl.edit_page = 0; ctl.edit_editing_value = False; ctl.edit_led_idx = 3
 captured = {}
 class LEDs:
     def set_button_leds(self, i, a, b, c): captured[i] = [tuple(a), tuple(b), tuple(c)]
@@ -315,7 +315,7 @@ code.save_config = lambda c: saved_cfgs.append(c)
 ctl._enter_edit_mode()
 S = ctl
 assert S.edit_screen == S.SCR_MAIN and S.edit_page == 1 and S.edit_cursor == 0
-assert S._screen_items() == ["Switch Setup", "Global Settings", "Exit"]
+assert S._screen_items() == ["Switch Setup", "Copy Page", "Global Settings", "Exit"]
 # Switch Setup: 클릭 → 페이지 선택 모드, 회전으로 P3, 클릭 → SWITCH 화면
 S._edit_click(); assert S.edit_editing_value
 S._edit_rotate(+1); assert S.edit_page == 2
@@ -343,7 +343,7 @@ S._edit_back(); assert S.edit_screen == S.SCR_ACTION and S.edit_cursor == 0
 S._edit_back(); assert S.edit_screen == S.SCR_SWITCH and S.edit_cursor == 7
 S._edit_back(); assert S.edit_screen == S.SCR_MAIN
 # Global Settings
-S.edit_cursor = 1; S._edit_click(); assert S.edit_screen == S.SCR_GLOBAL
+S.edit_cursor = 2; S._edit_click(); assert S.edit_screen == S.SCR_GLOBAL
 assert S._screen_items() == ["HoldTime", "HoldAt", "StartPg"]
 S._edit_click(); S._edit_rotate(+3); assert abs(S.hold_time - 0.8) < 1e-9; S._edit_click()
 S._edit_rotate(+1); S._edit_click(); S._edit_rotate(+1); assert S.hold_mode == "timeout"; S._edit_click()
@@ -353,9 +353,9 @@ for _ in range(9): S._edit_rotate(+1); seq.append(S.start_page)
 assert seq == [0,1,2,3,4,5,6,7,-1], seq
 S._edit_click()
 assert S._get_global_value("StartPg") == "Last"
-S._edit_back(); assert S.edit_screen == S.SCR_MAIN and S.edit_cursor == 1
+S._edit_back(); assert S.edit_screen == S.SCR_MAIN and S.edit_cursor == 2
 # Exit → 저장 + edit_mode 해제 + config가 현재 페이지로 복귀
-S.edit_cursor = 2; S._edit_click()
+S.edit_cursor = 3; S._edit_click()
 assert not S.edit_mode and saved_cfgs and saved_cfgs[-1]["hold_mode"] == "timeout"
 assert S.config is S.pages[S.page_idx]["buttons"]
 print("edit navigation OK")
@@ -454,7 +454,7 @@ print("page name OK")
 
 # ================= long-press back semantics =================
 S._enter_edit_mode()
-S.edit_cursor = 1; S._edit_click(); assert S.edit_screen == S.SCR_GLOBAL
+S.edit_cursor = 2; S._edit_click(); assert S.edit_screen == S.SCR_GLOBAL
 S._edit_click(); assert S.edit_editing_value          # HoldTime 편집 진입
 S._edit_back(); assert not S.edit_editing_value and S.edit_screen == S.SCR_GLOBAL  # 편집만 해제
 S._edit_back(); assert S.edit_screen == S.SCR_MAIN     # 한 단계 위
@@ -468,6 +468,64 @@ S._edit_back()
 assert not S.edit_editing_value and S.pages[5]["name"].startswith("V")
 S._edit_back(); S._edit_back()   # MAIN → exit
 print("long-press back OK")
+
+# ================= issue #2: Hold state-type active → Hold color =================
+S.edit_mode = False
+S.page_idx = 0; S.config = S.pages[0]["buttons"]; S._build_lookups()
+b0 = S.config[0]   # P1 sw1: press=scene1 RED, hold=scene5 GREEN? (defaults: hold none) → set explicitly
+b0["press"] = {"type": "scene", "color": "RED", "number": 1}
+b0["hold"]  = {"type": "scene", "color": "GREEN", "number": 2}
+S._build_lookups()
+S.current_scene = 0; S._update_button_leds(0); assert captured[0] == [RED] * 3            # press active
+S.current_scene = 1; S._update_button_leds(0); assert captured[0] == [GREEN] * 3          # hold active → hold color
+S.current_scene = 2; S._update_button_leds(0); assert captured[0] == [off(RED)] * 3       # neither → dim press
+S.current_scene = 0; S._update_button_leds(0); assert captured[0] == [RED] * 3            # both? press wins (scene 0 only press)
+print("issue #2 OK")
+
+# ================= issue #3: Copy Page =================
+S._enter_edit_mode()
+S.edit_page = 1                       # source = P2 FX
+S.edit_cursor = 1; S._edit_click()    # Copy Page → editing, dst = P3
+assert S.edit_editing_value and S.copy_dst == 2
+S._edit_rotate(+3); assert S.copy_dst == 5   # → P6 USER2
+S._edit_click()                        # copy
+assert not S.edit_editing_value
+assert S.pages[5]["buttons"] == S.pages[1]["buttons"] and S.pages[5]["buttons"] is not S.pages[1]["buttons"]
+assert S.pages[5]["name"] == S.pages[1]["name"]
+S.pages[5]["buttons"][0]["press"]["color"] = "OFF"   # 깊은 복사 확인
+assert S.pages[1]["buttons"][0]["press"]["color"] != "OFF"
+S.pages[5] = code.default_config()["pages"][5]      # 복원
+# src == dst → 무시
+S.edit_cursor = 1; S._edit_click(); S.copy_dst = S.edit_page; S._edit_click()
+S._edit_back()   # exit
+print("issue #3 OK")
+
+# ================= issue #4 + footswitch shortcut in Edit Mode =================
+class _Ev2:
+    def __init__(self, k, pressed): self.key_number, self.pressed, self.released = k, pressed, not pressed
+S.keys = _Keys(); S.hold_time = 0.5
+acts = []; S._handle_action = lambda i, k: acts.append((i, k))
+S._enter_edit_mode(); assert S.edit_screen == S.SCR_MAIN
+# 스위치 B(6) 짧게 → sw B Press 파라미터 화면
+S.keys.q.append(_Ev2(6, True)); S.process_buttons()
+S.keys.q.append(_Ev2(6, False)); S.process_buttons()
+assert S.edit_screen == S.SCR_PARAM and S.edit_btn_idx == 6 and S.edit_press_idx == 0 and S.edit_page == S.page_idx
+assert acts == []   # 실제 액션은 발생하지 않음
+# 스위치 2(1) 길게 → sw 2 Hold 파라미터 화면
+S.keys.q.append(_Ev2(1, True)); S.process_buttons(); S.press_times[1] -= 1.0
+S.keys.q.append(_Ev2(1, False)); S.process_buttons()
+assert S.edit_screen == S.SCR_PARAM and S.edit_btn_idx == 1 and S.edit_press_idx == 1
+# DN(9) 짧게 → DN Press 편집 (종료 아님)
+S.keys.q.append(_Ev2(9, True)); S.process_buttons()
+S.keys.q.append(_Ev2(9, False)); S.process_buttons()
+assert S.edit_mode and S.edit_btn_idx == 9 and S.edit_press_idx == 0
+# DN 1초 이상 → 저장 후 종료
+n_saved = len(saved_cfgs)
+S.keys.q.append(_Ev2(9, True)); S.process_buttons(); S.press_times[9] -= 1.2
+S.keys.q.append(_Ev2(9, False)); S.process_buttons()
+assert not S.edit_mode and len(saved_cfgs) == n_saved + 1
+assert acts == []
+print("issue #4 + edit shortcut OK")
 print("\nALL TESTS PASSED")
 
 # ================= per-LED color editing via Color click cycle =================

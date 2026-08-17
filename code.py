@@ -537,6 +537,7 @@ class FM3Controller:
         self.edit_name_pos = 0
         self.edit_ch_idx = 0      # Chans 편집 서브커서 (0-3)
         self.edit_redraw_at = 0   # 회전 디바운스: 이 시각 이후에 화면 갱신
+        self.copy_dst = 0         # Copy Page 대상 페이지
 
         self._build_lookups()
         self._init_display_groups()
@@ -947,6 +948,9 @@ class FM3Controller:
     # --------------------------------------------------------
     def process_buttons(self):
         now = time.monotonic()
+        if self.edit_mode:
+            self._process_buttons_edit(now)
+            return
         while event := self.keys.events.get():
             key = event.key_number
             if event.pressed:
@@ -974,6 +978,39 @@ class FM3Controller:
                 if key not in self.hold_fired and now - t0 >= self.hold_time:
                     self.hold_fired.add(key)
                     self._handle_action(key, "hold")
+
+    EDIT_EXIT_HOLD = 1.0  # Edit Mode에서 DN 스위치를 이 시간 이상 누르면 저장 후 종료 (issue #4)
+
+    def _process_buttons_edit(self, now):
+        """Edit Mode 중 풋스위치: 실제 동작 대신 편집 단축키.
+        - Press  → 현재 페이지 해당 스위치의 Press 액션 편집 화면으로
+        - Hold   → 해당 스위치의 Hold 액션 편집 화면으로
+        - DN을 1초 이상 → Edit Mode 저장 후 종료 (issue #4)"""
+        while event := self.keys.events.get():
+            key = event.key_number
+            if event.pressed:
+                self.press_times[key] = now
+            elif event.released:
+                t0 = self.press_times.pop(key, None)
+                if t0 is None:
+                    continue
+                duration = now - t0
+                if key == 9 and duration >= self.EDIT_EXIT_HOLD:
+                    self._exit_edit_mode()
+                    return
+                self._edit_jump_to_switch(key, "hold" if duration >= self.hold_time else "press")
+
+    def _edit_jump_to_switch(self, idx, which):
+        """현재 페이지의 스위치 idx / press|hold 파라미터 화면으로 바로 이동"""
+        self.edit_page = self.page_idx
+        self.edit_btn_idx = idx
+        self.edit_press_idx = 0 if which == "press" else 1
+        self.edit_screen = self.SCR_PARAM
+        self.edit_cursor = 0
+        self.edit_editing_value = False
+        self.edit_led_idx = 3
+        self._refresh_edit_preview()
+        self.display_dirty = True
 
     def _handle_action(self, idx, key):
         cfg = self.config[idx]
@@ -1117,9 +1154,14 @@ class FM3Controller:
             self.leds.set_button_leds(idx, *leds)
             return
 
-        # Press가 상태형이면 Press 색상이 LED 주도 (Hold는 Screen만 — 설계 원칙)
+        # Press가 상태형이면 Press 색상이 LED 주도.
+        # 예외(issue #2): Hold도 상태형이고 Press는 비활성·Hold는 활성이면 Hold 색을 켠다
+        # (예: Press=scene1 Red, Hold=scene2 Green → scene2 활성 시 Green)
         if pt in self.STATE_TYPES:
-            leds = self._state_leds(pa)
+            if ht in self.STATE_TYPES and not self._state_active(pa) and self._state_active(ha):
+                leds = self._state_leds(ha)
+            else:
+                leds = self._state_leds(pa)
             self.leds.set_button_leds(idx, *leds)
             return
 
@@ -1147,6 +1189,26 @@ class FM3Controller:
             return
 
         self.leds.set_button_color(idx, (0, 0, 0))
+
+    def _state_active(self, a):
+        """상태형 액션이 현재 '활성'인지 (LED 밝게 켤 조건). 프리셋에 없는 블록은 비활성."""
+        t = a.get("type", "none")
+        if t == "effect":
+            fx_id = EFFECT_IDS.get(a.get("effect", ""))
+            return fx_id is not None and fx_id in self.fx_states and not self.fx_states[fx_id]
+        if t == "scene":
+            return self.current_scene == a.get("number", 1) - 1
+        if t == "channel_select":
+            fx_id = EFFECT_IDS.get(a.get("effect", ""))
+            return (fx_id is not None and fx_id in self.fx_states
+                    and self.fx_channels.get(fx_id, 0) == a.get("channel", 0))
+        if t == "looper":
+            btn = a.get("button", 0)
+            if btn == 2:
+                return False
+            mask = LOOPER_LED_MASKS[btn] if btn < len(LOOPER_LED_MASKS) else 0
+            return bool(self.looper_state & mask)
+        return False
 
     def _state_leds(self, a):
         """상태형 액션의 현재 LED 3색"""
@@ -1338,6 +1400,7 @@ class FM3Controller:
 
     def _enter_edit_mode(self):
         self.edit_mode = True
+        self.press_times.clear(); self.hold_fired.clear()  # 진입 중 눌린 스위치 무시
         self.edit_screen = self.SCR_MAIN
         self.edit_cursor = 0
         self.edit_editing_value = False
@@ -1349,6 +1412,7 @@ class FM3Controller:
 
     def _exit_edit_mode(self):
         self.edit_mode = False
+        self.press_times.clear(); self.hold_fired.clear()
         self.full_config["hold_time"] = self.hold_time
         self.full_config["hold_mode"] = self.hold_mode
         self.full_config["start_page"] = self.start_page
@@ -1358,6 +1422,17 @@ class FM3Controller:
         self._build_lookups()
         self._update_all_button_leds()
         self.display_dirty = True
+
+    def _copy_page(self, src, dst):
+        """페이지 src의 버튼/이름을 dst로 깊은 복사 (issue #3). src==dst면 무시."""
+        if src == dst:
+            return
+        self.pages[dst]["buttons"] = _copy_json(self.pages[src]["buttons"])
+        self.pages[dst]["name"] = self.pages[src].get("name", "")
+        if dst == self.page_idx:
+            self.config = self.pages[self.page_idx]["buttons"]
+            self._build_lookups()
+            self._update_all_button_leds()
 
     # ---- 편집 대상 접근 ----
     def _edit_buttons(self):
@@ -1371,7 +1446,7 @@ class FM3Controller:
     def _screen_items(self):
         s = self.edit_screen
         if s == self.SCR_MAIN:
-            return ["Switch Setup", "Global Settings", "Exit"]
+            return ["Switch Setup", "Copy Page", "Global Settings", "Exit"]
         if s == self.SCR_SWITCH:
             # 0 = 헤더(페이지 이름 편집), 1..10 = 스위치
             return ["__hdr__"] + list(self.BTN_ABBREV)
@@ -1404,7 +1479,7 @@ class FM3Controller:
             self.edit_cursor = self.edit_press_idx
         elif s == self.SCR_GLOBAL:
             self.edit_screen = self.SCR_MAIN
-            self.edit_cursor = 1
+            self.edit_cursor = 2
         self._refresh_edit_preview()
         self.display_dirty = True
 
@@ -1449,6 +1524,15 @@ class FM3Controller:
                     self.edit_editing_value = False
                     self.edit_screen = self.SCR_SWITCH
                     self.edit_cursor = 1   # 첫 스위치 (0 = 페이지 이름 헤더)
+            elif item == "Copy Page":
+                # issue #3: 소스 = Switch 행에서 고른 페이지(edit_page), 회전으로 대상 선택, 클릭 = 복사
+                if not self.edit_editing_value:
+                    self.edit_editing_value = True
+                    # 기본 대상: 소스 다음 페이지
+                    self.copy_dst = (self.edit_page + 1) % len(self.pages)
+                else:
+                    self._copy_page(self.edit_page, self.copy_dst)
+                    self.edit_editing_value = False
             elif item == "Global Settings":
                 self.edit_screen = self.SCR_GLOBAL
                 self.edit_cursor = 0
@@ -1522,7 +1606,11 @@ class FM3Controller:
         s = self.edit_screen
         if self.edit_editing_value:
             if s == self.SCR_MAIN:
-                self.edit_page = (self.edit_page + delta) % len(self.pages)
+                item = self._screen_items()[self.edit_cursor]
+                if item == "Copy Page":
+                    self.copy_dst = (self.copy_dst + delta) % len(self.pages)
+                else:
+                    self.edit_page = (self.edit_page + delta) % len(self.pages)
             elif s == self.SCR_SWITCH:
                 # 헤더(페이지 이름) 편집: 커서 위치 문자 순환
                 ch = self.edit_name[self.edit_name_pos]
@@ -1845,12 +1933,19 @@ class FM3Controller:
         pg_txt = "P%d %s" % (self.edit_page + 1, pg.get("name", "")[:6])
         c = self.edit_cursor
         e = self.edit_editing_value
-        # "Switch Setup  P2 FX" — 페이지 선택 중(*)이면 노란색
+        # "Switch  P2 FX" — 페이지 선택 중(*)이면 노란색
         self._row(0, "%sSwitch %s" % ("*" if (c == 0 and e) else (">" if c == 0 else " "), pg_txt),
                   c == 0, 0xFFFF00 if (c == 0 and e) else None)
-        self._row(1, "%sGlobal Settings" % (">" if c == 1 else " "), c == 1)
-        self._row(2, "%sExit" % (">" if c == 2 else " "), c == 2)
-        self._rows_clear(3)
+        # "Copy   P2 -> P3" — 대상 선택 중이면 노란색 (소스 = Switch 행의 페이지)
+        if c == 1 and e:
+            dst = self.pages[self.copy_dst]
+            self._row(1, "*Copy P%d->P%d %s" % (self.edit_page + 1, self.copy_dst + 1, dst.get("name", "")[:5]),
+                      True, 0xFFFF00)
+        else:
+            self._row(1, "%sCopy Page" % (">" if c == 1 else " "), c == 1)
+        self._row(2, "%sGlobal Settings" % (">" if c == 2 else " "), c == 2)
+        self._row(3, "%sExit" % (">" if c == 3 else " "), c == 3)
+        self._rows_clear(4)
 
     def _draw_switch_table(self):
         self._set_layout(self.LAYOUT_TABLE)

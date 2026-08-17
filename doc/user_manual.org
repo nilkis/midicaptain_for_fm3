@@ -118,7 +118,7 @@ Each switch has separate Press and Hold actions.
 ** LED color rules
 - Each action gets one of 12 palette colors (same as FM3): Red, Orange, Yellow, Yellow-Green, Green, Teal, Cyan, Blue, Purple, Pink, White, Off
 - The 3 LEDs of a switch can be given different colors
-- The *Press* action's color drives the LED. Hold is shown on screen only (Hold color used if Press is none)
+- The *Press* action's color drives the LED. Hold is shown on screen only — except when both Press and Hold are state-type (scene/effect/…) and only the Hold one is active: then the Hold color is shown (e.g. Press=scene 1 red, Hold=scene 2 green → green while scene 2 is active)
 - active (on) = the color, inactive (off) = the same color, very dim
 
 ** Looper LEDs
@@ -150,6 +150,8 @@ Adjust in Global Settings.
 | turn        | move cursor / (while editing) change value                          |
 | click       | select/enter / (while editing) confirm or next step                 |
 | hold        | back one level. While editing a value: end editing only. On MAIN: save & exit |
+| footswitch  | *shortcut*: press → jump to that switch's Press editor, hold → its Hold editor (current page) |
+| DN switch ≥ 1 s | save & exit Edit Mode from anywhere                                    |
 
 ** Screen structure
 #+begin_example
@@ -157,6 +159,7 @@ MAIN
  ├─ Switch  P2 FX      → click → turn to pick page → click → Switch table
  │    ├─ (header) P2 FX → click → edit page name
  │    └─ 1 ~ Dn        → click → Press / Hold → parameter editor
+ ├─ Copy Page          → click → turn to pick destination → click = copy (source = page in the Switch row)
  ├─ Global Settings    → HoldTime / HoldAt / StartPg
  └─ Exit               → save & exit
 #+end_example
@@ -186,6 +189,12 @@ Click header → =*P2 [F]X    = (yellow, [ ] = current slot)
 - click = next slot; clicking on the 6th slot confirms
 - hold = confirm immediately
 - Max 6 chars. All spaces → default name like =P2=
+
+** Copy Page
+Copies one page's switches and name onto another — handy for building a USER page from an existing one.
+1. On MAIN, pick the *source* page in the =Switch= row (click → turn → click back out, or just turn while editing)
+2. Move to =Copy Page=, click → =*Copy P2->P6 USER2= (turn = destination), click = copy
+Long-press cancels. Copying onto the current page takes effect immediately.
 
 ** Parameter editor (Press / Hold)
 Switch → choose Press or Hold → item table

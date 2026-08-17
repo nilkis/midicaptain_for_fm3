@@ -118,7 +118,7 @@ Global Settings의 =StartPg= 로 부팅 시 페이지를 정합니다.
 ** LED 색상 규칙
 - 각 동작에 12색 팔레트(FM3와 동일) 중 하나를 지정: Red, Orange, Yellow, Yellow-Green, Green, Teal, Cyan, Blue, Purple, Pink, White, Off
 - 스위치의 LED 3개를 각각 다른 색으로도 지정 가능
-- *Press* 동작의 색이 LED를 결정합니다. Hold 동작은 화면에만 표시 (Press가 none이면 Hold 색 사용)
+- *Press* 동작의 색이 LED를 결정합니다. Hold 동작은 화면에만 표시 — 단, Press·Hold가 모두 상태형(scene/effect 등)이고 Hold 쪽만 활성이면 Hold 색을 켭니다 (예: Press=scene1 빨강, Hold=scene2 초록 → scene2 활성 시 초록)
 - 활성(on) = 지정 색, 비활성(off) = 같은 색을 아주 어둡게
 
 ** Looper LED
@@ -150,6 +150,8 @@ Global Settings에서 조절합니다.
 | 회전        | 커서 이동 / (편집 중) 값 변경                              |
 | 클릭        | 선택·진입 / (편집 중) 확정 또는 다음 단계                  |
 | 길게 누름   | 한 단계 뒤로. 값 편집 중이면 편집만 종료. MAIN에서는 저장 후 종료 |
+| 풋스위치    | *단축키*: 짧게 밟으면 그 스위치의 Press 편집, 길게 밟으면 Hold 편집 화면으로 바로 이동 (현재 페이지) |
+| DN 스위치 1초 이상 | 어디서든 저장 후 Edit Mode 종료                            |
 
 ** 화면 구조
 #+begin_example
@@ -157,6 +159,7 @@ MAIN
  ├─ Switch  P2 FX      → 클릭 → 회전으로 페이지 선택 → 클릭 → Switch 테이블
  │    ├─ (헤더) P2 FX  → 클릭 → 페이지 이름 편집
  │    └─ 1 ~ Dn        → 클릭 → Press / Hold 선택 → 파라미터 편집
+ ├─ Copy Page          → 클릭 → 회전으로 대상 선택 → 클릭 = 복사 (소스 = Switch 행의 페이지)
  ├─ Global Settings    → HoldTime / HoldAt / StartPg
  └─ Exit               → 저장 후 종료
 #+end_example
@@ -186,6 +189,12 @@ MAIN
 - 클릭 = 다음 칸. 6번째 칸에서 클릭하면 확정
 - 길게 누름 = 즉시 확정
 - 최대 6자. 전부 공백이면 =P2= 같은 기본 이름
+
+** 페이지 복사 (Copy Page)
+한 페이지의 스위치 구성과 이름을 다른 페이지로 복사합니다 — 기존 페이지를 바탕으로 USER 페이지를 만들 때 유용.
+1. MAIN에서 =Switch= 행에서 *소스* 페이지 선택 (클릭 → 회전 → 다시 클릭으로 빠져나오거나, 편집 중 회전만)
+2. =Copy Page= 로 이동 → 클릭 → =*Copy P2->P6 USER2= (회전 = 대상) → 클릭 = 복사
+길게 누르면 취소. 현재 페이지로 복사하면 즉시 반영됩니다.
 
 ** 파라미터 편집 (Press / Hold)
 스위치 → Press 또는 Hold 선택 → 항목 테이블
