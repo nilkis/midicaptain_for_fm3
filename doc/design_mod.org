@@ -1,0 +1,285 @@
+#+title: Design V2
+
+* Design 개선
+다음은 같은 의미이다
++ switch = button
++ activation = on
++ deactivation = off
+  
+** Display Screen
+Preset이름, Scene이름 폰트 키우기
+
+** 설정
+*** effects on/off Function 설정 [수정]
+기존과 동일하게 동작하되 "effects channel rotation"을 effects on/off에 종속하는
+sub function으로 간주한다. effects on/off 설정에 옵션으로 "effects channel
+rotation" sub-function을 선택할 수 있게 한다.
+
++ effects channel rotation을 선택하지 않음 - effects on/off function의
+  Activation 색상 1개를 설정한다.
++ effects channel rotation을 선택
+  - [A,B,C,D] 중 2개 이상을 선택할 수 있다.
+  - 선택한 채널별로 Activation 색상을 설정한다.
+*** looper [신규]
++ Record : Recording, Overdubbing *2개 색상* 설정 (기본 : 빨강, 주황)
+  - Color Palette 규칙(버튼당 1색)의 *예외*. Record 버튼만 상태별 2색을 지정한다
++ Play : 색상 설정(기본: 초록)
++ Undo : 색상 설정(기본: 흰색). Activation Type = tap
++ Once / Reverse / Half : 색상 설정(기본 : 시안/파랑/보라)
+
+*** Hold Time [신규]
+Press/Hold를 가르는 시간 N
++ *전역 설정* (버튼별 아님)
++ 범위 0.3 ~ 2.0초, 0.1초 단위
++ 기본값 0.5초 (현재 코드와 동일)
++ 하한 0.3초 이유: 그 이하면 일반 Press와 구분이 어렵고 tap tempo 연타와 충돌
+
+** Color Palette [신규]
+현재 rgb 숫자로 색상을 지정하는 방식이 불편하여
+미리 만들어놓은 12가지 색상을 보여주고 선택하는 방식으로 변경
+12가지 색상은 FM3가 사용하는 12개와 동일하게 한다
+
+*** FM3 / FC 컨트롤러 12색 팔레트
+FM3 온보드 스위치 및 FC-6/FC-12의 Per-Switch LED Ring Color 목록과 동일.
+(출처: [[https://wiki.fractalaudio.com/wiki/index.php?title=FC-6_and_FC-12_foot_controllers][Fractal Audio Wiki — FC-6/FC-12]], FC-6 Owner's Manual "LED Ring Colors")
+
+|  # | 색상 이름    | 코드 상수    | RGB (Neopixel 제안값) | 비고                          |
+|----+--------------+--------------+-----------------------+-------------------------------|
+|  1 | Red          | =RED=          | (255, 0, 0)           | Amp / Record                  |
+|  2 | Orange       | =ORANGE=       | (255, 100, 0)         | Drive / Overdub               |
+|  3 | Yellow       | =YELLOW=       | (255, 220, 0)         | Compressor / Gate             |
+|  4 | Yellow-Green | =YELLOW_GREEN= | (150, 255, 0)         |                               |
+|  5 | Green        | =GREEN=        | (0, 255, 0)           | Cab / Reverb / Play           |
+|  6 | Teal         | =TEAL=         | (0, 200, 120)         |                               |
+|  7 | Cyan         | =CYAN=         | (0, 220, 220)         | Modulation (Chorus 등) / Once |
+|  8 | Blue         | =BLUE=         | (0, 80, 255)          | Delay / Reverse               |
+|  9 | Purple       | =PURPLE=       | (150, 0, 255)         | Pitch / Synth / Half-speed    |
+| 10 | Pink         | =PINK=         | (255, 0, 150)         | Filter / Wah / Looper 블록    |
+| 11 | White        | =WHITE=        | (200, 200, 200)       | Volume / Mixer / Undo         |
+| 12 | None (Off)   | =OFF=          | (0, 0, 0)             | 미할당                        |
+
+- "비고" 열의 블록 매핑은 FM3 레이아웃 그리드의 블록 색상 관례를 참고한 것으로, 기본 색상 선택 시 가이드로 사용
+- RGB 값은 Neopixel(WS2812)에서 육안으로 FM3 LED와 비슷하게 보이도록 조정한 제안값이며 실기기에서 튜닝 필요
+  (특히 Orange/Yellow는 Neopixel에서 붉게 치우치기 쉬우므로 G 값을 넉넉히 줌)
+- 코드에는 =FRACTAL_COLORS= 팔레트 상수(이름 → RGB)로 정의하고, config.json에는 RGB 값 대신
+  *색상 이름(또는 인덱스)* 을 저장하는 것을 고려 (팔레트 튜닝 시 config 일괄 반영 가능)
+
++ activation(on) 색상 :: 12개중 하나를 선택
++ deactivation(off) 색상 :: activation 색상 × =OFF_W= (0.02, 현재 코드와 동일). 켜짐/꺼짐이 명확히 구분되어야 함
++ button당 3개의 LED 에 각각 지정(기본은 3개의 LED 모두 같은 색상)
+
+버튼의 색상을 지정하는 방법
+
+1. 기본: 미리 설정한 12개의 팔레트 색상 중 하나를 선택
+2. 3개의 LED를 별도로 지정할 수도 있음
+3. 예외: looper Record는 상태별 2색(Recording/Overdubbing), effects channel rotation은 채널별 색
+
+*** 색상 표기 (이 문서의 Pre-defined Page 표에서 사용)
++ =Cyan= :: LED1,2,3 모두 Cyan
++ =Cyan_Teal_Blue= :: LED별 지정 — LED1-Cyan, LED2-Teal, LED3-Blue (=_= 구분)
++ =Yellow,Yellow-Green,Orange,Red= :: 채널별 지정 — A,B,C,D 순 (=,= 구분)
++ 채널별 지정과 LED별 지정은 *동시에 사용하지 않는다* (channel rotation 버튼은 3 LED 동일 색)
+
+*** config 저장 형식
++ config.json에는 RGB 대신 팔레트 색상 이름을 저장 (=FRACTAL_COLORS= 상수 참조)
++ 기존 config(v2, RGB 값)에서의 마이그레이션은 하지 않고 *신규 기본값으로 overwrite*
+
+** Functions(기능) 
+1. scene select
+2. preset inc/dec
+3. effects on/off
+   - sub-function :: effects channel rotation [수정]
+4. effects channel select [신규]
+5. tuner on/off (현재는 on만 구현됨. 한번 더 누를 경우 off되게 한다)
+6. tap tempo
+7. looper (Record, Play, Undo, Once, Reverse, Half-speed) [신규]
+8. page inc/dec [신규]
+   
+** Button Action(용어 변경)
+Button Action은 아래 2가지가 있으며 각각 Action에 위에서 서술한 기능을 할당할 수 있다.
++ Press Action(Short Press) :: 짧게 누름(N초 이하)
++ Hold Action(Long Press) :: 길게 누름(N초 이상)
++ N :: 사용자가 0.1초 단위로 설정할 수 있다 (전역, 0.3~2.0초, 기본 0.5초 — §Hold Time 참조).[신규]
+
+Action 기능 할당은 몇가지 예외가 있다
++ effects channel rotation : Hold Action만 가능 (Press에 effects on/off가 있는 버튼에 한함)
++ tap tempo는 Press 시점에 즉시 발화(release 대기 없음)하므로, 같은 버튼의 Hold에 다른 기능(예: tuner)을 할당할 수 있다
+  
+** Activation Type
++ select : 기능(Function)내의 기능 상태(Function State)중 1개만 on되고 나머지는 off
+  ex) scene select
+  ex) scene select, effects channel select
++ toggle : Action에 따라 기능이 on/off toggle
+  ex) effects on/off 
++ rotation : Action에 따라 기능의 상태가 순차적으로 변화
+  ex) effects channel rotation. Action이 가해질 때. channel이 바뀜. A->B->C->D
+  + 상태를 사용자가 설정할 수 있다 [신규]
+    ex) [A,B,C,D] 4가지 상태중 선택. 기본은 [A,B,C,D] 4개의 상태
+  + effects on/off가 Press에 할당된 경우에 한하여 Hold에 부가적으로
+    설정할 수 있다. [신규]
++ tap : 지속 상태가 없는 순간 동작. LED는 평소 Deactivation 색상으로 있다가
+  Press 순간에만 Activation 색상으로 잠깐 점등한다 (preset inc/dec, page inc/dec, looper undo, tap tempo)
+
+    | Function                 | Activation Type |
+    |--------------------------+-----------------|
+    | scene select             | select          |
+    | preset inc/dec           | tap             |
+    | effects on/off           | toggle          |
+    | effects channel rotation | rotation        |
+    | effects channel select   | select          |
+    | tuner on/off             | toggle          |
+    | tap tempo                | tap             |
+    | looper                   | toggle, tap     |
+    | page inc/dec             | tap             |
+
+    looper 세부: Record/Play/Once/Reverse/Half = toggle, Undo = tap
+    
+*** Function State(기능 상태)
+Activation Type이 select 또는 rotation일 때 할당된 기능내에 있는 여러가지 상태중
+하나를 유지하게된다.
++ scene select function state : scene1,...,scene8 
++ Drive1 effects channel select function state :  A, B, C, D
++ Delay1 effects channel rotation function state : A, B, C, D 
+   
+** LED 표현 
+Activation/Deactivation 색상을 LED로 시각적으로 표현한다
+"Press Action"은 LED 및 Screen Display에 표현한다.
+"Hold Action"은 Screen Display에만 표현한다.(후술하는 경우 예외)
+여기에 언급되지 않은 Action Type 및 Function은 기존과 동일하다.
+
+*** tap 타입 공통 규칙 [신규]
+Activation Type이 tap인 기능(preset inc/dec, page inc/dec, looper undo, tap tempo)은
+평소 Deactivation 색상, Press 순간 Activation 색상으로 잠깐 점등 후 복귀한다.
+Screen에는 동작 내용을 임시 표시한다 (예: "PRESET +", "PAGE 2 FX", "LOOPER UNDO").
+(tap tempo는 기존대로 박자에 맞춘 점멸을 유지)
+
+*** effects channel select [신규]
+effect가 가질수 있는 상태는 A, B, C, D이다 (A,B,C,D는 채널)
+effect 종류별로 "scene select"와 동일하게 동작한다.
+채널 변경만 하며 bypass 상태는 건드리지 않는다 (bypass는 effects on/off 담당).
+
+Amp 블록의 SysEx effect ID는 Fractal SysEx 스펙 Appendix의 =ID_DISTORT1= = *58* 이다
+(스펙 enum 순서상 COMP1=46 → GRAPHEQ1=50 → PARAEQ1=54 → DISTORT1=58).
+FM3는 Amp 블록을 1개만 지원하므로 =EFFECT_IDS= 에 =AMP1: 58= 하나만 추가한다
+(사용자 표기 AMP1, SysEx ID는 DISTORT1). FM9/Axe-Fx III는 Amp 2개(DISTORT2=59)이지만 이 프로젝트 범위 밖.
+
+**** Usecase
+  | Button |     1 |     2 |     3 |     4 | A        | B        | C        | D        |
+  |--------+-------+-------+-------+-------+----------+----------+----------+----------|
+  | Press  | Amp A | Amp B | Amp C | Amp D | Delay1 A | Delay1 B | Delay1 C | Delay1 D |
+
++ 2 Press Action :: 1,3,4는 Deactivation 색상, 2는 Activation 색상. A,B,C,D는 영향받지 않고 그대로이다.
++ B Press Action :: 1,2,3,4는 그대로. A,C,D는 Deactivation 색상, B는 Activation 색상
+
+*** effects on/off [수정]
+기존 LED 표현 방식과 동일하다. Activation 색상도 기존과 동일하다. 다만, "effects
+channel rotation"이 sub-function으로 변경되었기 때문에 의미가 달라져서 다시
+아래와 같이 정리한다.
+
+Activation 색상은 다음과 같이 결정된다
++ "effects channel rotation" sub-function 선택하지 않은 경우: "effects on/off"에
+  설정된 Activation 색상
++ "effects channel rotation" sub-function 선택한 경우: 현재 선택된 채널에 할당된
+  Activation 색상
+*** looper [신규]
+[[file:looper_led_design.org]] 참조
+
+*** page inc/dec [신규]
+LED는 tap 타입 공통 규칙을 따른다 (preset inc/dec와 동일).
+페이지가 바뀌면 Screen에 새 페이지 번호/이름을 임시 표시한다 (Drive1 ON/OFF 표시와 같은 방식).
+Screen 좌상단의 상시 페이지 표시(=P1 FX=)도 유지한다.
+page inc/dec는 휠 회전으로도 조작 가능 (휠 우회전 = page inc, 좌회전 = page dec).
+
+** Pre-defined Page
+색상 표기는 §Color Palette > 색상 표기 참조.
+
+*** Page1 : Scene 
+| Button | Action | Function       | Color |
+|--------+--------+----------------+-------|
+| 1      | Press  | scene select 1 | Red   |
+| 2      | Press  | scene select 2 | Red   |
+| 3      | Press  | scene select 3 | Red   |
+| 4      | Press  | scene select 4 | Red   |
+| A      | Press  | scene select 5 | Red   |
+| B      | Press  | scene select 6 | Red   |
+| C      | Press  | scene select 7 | Red   |
+| D      | Press  | scene select 8 | Red   |
+| Up     | Press  | preset inc     | Green |
+|        | Hold   | page inc       |       |
+| Dn     | Press  | preset dec     | Green |
+|        | Hold   | page dec       |       |
+
+*** Page2 : Effects
+| Button | Action | Function                       | Color                                                                      |
+|--------+--------+--------------------------------+----------------------------------------------------------------------------|
+| 1      | Press  | chorus1 effect on/off          | Cyan_Blue_Cyan                                                             |
+| 2      | Press  | phaser1 effect on/off          | Green                                                                      |
+| 3      | Press  | flanger1 effect on/off         | Pink                                                                       |
+| 4      | Press  | tap tempo                      | Blue                                                                       |
+|        | Hold   | tuner on/off                   | Blue                                                                       |
+| A      | Press  | comp1 effect on/off            | Cyan                                                                       |
+| B      | Press  | drive1 effect on/off           |                                                                            |
+|        | Hold   | drive1 effect channel rotation | Yellow,Yellow-Green,Orange,Red                                             |
+| C      | Press  | peq1 effect on/off             | Purple                                                                     |
+| D      | Press  | delay1 effect on/off           |                                                                            |
+|        | Hold   | delay1 effect channel rotation | Cyan,Teal,Blue,Purple                                                      |
+| Up     | Press  | preset inc                     | Green                                                                      |
+|        | Hold   | page inc                       |                                                                            |
+| Dn     | Press  | preset dec                     | Green                                                                      |
+|        | Hold   | page dec                       |                                                                            |
+
+*** Page3 : Amp Channel
+| Button | Action | Function                       | Color                          |
+|--------+--------+--------------------------------+--------------------------------|
+| 1      | Press  | comp1 effect on/off            | Cyan                           |
+| 2      | Press  | drive1 effect on/off           |                                |
+|        | Hold   | drive1 effect channel rotation | Yellow,Yellow-Green,Orange,Red |
+| 3      | Press  | peq1 effect on/off             | Purple                         |
+| 4      | Press  | delay1 effect on/off           |                                |
+|        | Hold   | delay1 effect channel rotation | Cyan,Teal,Blue,Purple          |
+| A      | Press  | amp1 effect channel select A   | Green                          |
+| B      | Press  | amp1 effect channel select B   | Yellow                         |
+| C      | Press  | amp1 effect channel select C   | Orange                         |
+| D      | Press  | amp1 effect channel select D   | Red                            |
+| Up     | Press  | preset inc                     | Green                          |
+|        | Hold   | page inc                       |                                |
+| Dn     | Press  | preset dec                     | Green                          |
+|        | Hold   | page dec                       |                                |
+
+*** Page4 : Looper
+| Button | Action | Function          | Color  |
+|--------+--------+-------------------+--------|
+| 1      | Press  | looper reverse    | Blue   |
+| 2      | Press  | looper half-speed | Purple |
+| 3      | Press  | looper1 effect on/off | Pink |
+| 4      | Press  | tap tempo         | Blue   |
+|        | Hold   | tuner on/off      | Blue   |
+| A      | Press  | looper play       | Green  |
+| B      | Press  | looper record     | Red (Recording) / Orange (Overdubbing) |
+| C      | Press  | looper undo       | White  |
+| D      | Press  | looper once       | Cyan   |
+| Up     | Press  | preset inc        | Green  |
+|        | Hold   | page inc          |        |
+| Dn     | Press  | preset dec        | Green  |
+|        | Hold   | page dec          |        |
+
+*** Page5 : User1
+Blank
+*** Page6: User2
+Blank
+*** Page7: User3
+Blank
+*** Page8: User4
+Blank
+
+** 기존 코드 대비 변경 요약 (구현 체크리스트)
++ [ ] =EFFECT_IDS= 에 =AMP1: 58= 추가 (SysEx ID_DISTORT1. FM3는 Amp 1개)
++ [ ] =FRACTAL_COLORS= 12색 팔레트 상수 추가, config는 색상 이름 저장 (v3, 마이그레이션 없이 overwrite)
++ [ ] Edit Mode 색상 편집: RGB 5단위 증감 → 팔레트 선택 방식
++ [ ] Hold time 전역 설정 (0.3~2.0초) — Edit Mode에서 편집
++ [ ] Function 신규: effects channel select, page inc/dec
++ [ ] Function 수정: tuner on/off 토글, channel rotation을 on/off의 sub-function으로
++ [ ] Activation Type "tap" LED 공통 규칙 적용 (preset/page inc/dec, undo, tap tempo)
++ [ ] looper Record 2색(Recording/Overdubbing) 상태 표시, Undo 상시 점등 제거
++ [ ] Pre-defined Page 1~4 기본값 + User 페이지 5~8 (Blank)
++ [ ] Screen: preset/scene 이름 폰트 확대, 페이지 전환 임시 표시
