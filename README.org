@@ -1,8 +1,18 @@
 #+title: Readme
 
-* Midi-Captain for Fractal Audio Devices (FM3, FM9,...)
-FM3, FM9등 Fractal Audio Systems 제품 특화된 Midi-Captain Customizing
-양방향 통신을 사용해서 Effects Block의 on/off변화를 미디 캡틴과 동기화
+* Midi-Captain for FM3
+
+*Your MIDI Captain finally knows what your FM3 is doing.*
+
+Bidirectional firmware for the Paint Audio MIDI Captain that keeps its LEDs and display
+*in sync with the real state* of a Fractal FM3 — effect block on/off, channels, scenes,
+preset/scene names, tempo and looper — using Fractal's SysEx protocol.
+Change a scene on the FM3 and the pedal's LEDs follow. Toggle a block on the pedal and
+the FM3 answers back. No more guessing which light means what.
+
+미디캡틴은 원래 단방향(CC/PC) 컨트롤러라 FM3의 실제 상태를 알 수 없어, scene을 바꾸면
+이펙트 on/off LED가 실제와 어긋나는 문제가 있습니다. 이 펌웨어는 Fractal SysEx로 FM3의
+상태를 읽어 미디캡틴의 LED/화면을 항상 실제 상태와 일치시킵니다.
 
 [[file:demo.gif]]
 
