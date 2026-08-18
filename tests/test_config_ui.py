@@ -519,12 +519,33 @@ assert S.edit_screen == S.SCR_PARAM and S.edit_btn_idx == 1 and S.edit_press_idx
 S.keys.q.append(_Ev2(9, True)); S.process_buttons()
 S.keys.q.append(_Ev2(9, False)); S.process_buttons()
 assert S.edit_mode and S.edit_btn_idx == 9 and S.edit_press_idx == 0
-# DN 1초 이상 → 저장 후 종료
-n_saved = len(saved_cfgs)
+# DN 혼자 1초 이상 → DN Hold 편집 (종료 아님 — 충돌 해소)
 S.keys.q.append(_Ev2(9, True)); S.process_buttons(); S.press_times[9] -= 1.2
 S.keys.q.append(_Ev2(9, False)); S.process_buttons()
+assert S.edit_mode and S.edit_btn_idx == 9 and S.edit_press_idx == 1
+# Up+Dn 동시 1초 이상 → 저장 후 종료
+class _KQ:
+    def __init__(self, o): self.o = o
+    def get(self): return self.o.q.pop(0) if self.o.q else None
+    def clear(self): self.o.q.clear()
+_Keys._E = _KQ
+n_saved = len(saved_cfgs)
+S.keys.q.append(_Ev2(4, True)); S.keys.q.append(_Ev2(9, True)); S.process_buttons()
+assert S.edit_mode                              # 아직 1초 안 됨
+S.press_times[4] -= 1.2; S.press_times[9] -= 1.2
+S.process_buttons()
 assert not S.edit_mode and len(saved_cfgs) == n_saved + 1
+# 종료 후 release 이벤트가 와도 무시 (press_times 비워짐)
+S.keys.q.append(_Ev2(4, False)); S.keys.q.append(_Ev2(9, False)); S.process_buttons()
 assert acts == []
+# 콤보 시도 중 한 발 먼저 떼면 단축키로 처리하지 않음
+S._enter_edit_mode()
+S.keys.q.append(_Ev2(4, True)); S.keys.q.append(_Ev2(9, True)); S.process_buttons()
+S.keys.q.append(_Ev2(4, False)); S.process_buttons()
+assert S.edit_screen == S.SCR_MAIN            # Up release 무시됨
+S.keys.q.append(_Ev2(9, False)); S.process_buttons()
+assert S.edit_screen == S.SCR_PARAM and S.edit_btn_idx == 9   # 남은 Dn release는 단축키
+S._edit_back(); S._edit_back(); S._edit_back()
 print("issue #4 + edit shortcut OK")
 print("\nALL TESTS PASSED")
 

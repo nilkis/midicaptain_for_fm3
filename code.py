@@ -961,7 +961,11 @@ class FM3Controller:
                     self.send_tap_tempo()
                     self._show_temp("BPM", "%d" % self.tempo_bpm)
             elif event.released:
-                press_time = self.press_times.pop(key, 0)
+                press_time = self.press_times.pop(key, None)
+                if press_time is None:
+                    # press 기록이 없는 release (Edit Mode 진입/종료 중 눌려 있던 키 등) → 무시
+                    self.hold_fired.discard(key)
+                    continue
                 if key in self.hold_fired:
                     # timeout 모드에서 이미 hold 발동됨 → release는 무시
                     self.hold_fired.discard(key)
@@ -985,7 +989,14 @@ class FM3Controller:
         """Edit Mode 중 풋스위치: 실제 동작 대신 편집 단축키.
         - Press  → 현재 페이지 해당 스위치의 Press 액션 편집 화면으로
         - Hold   → 해당 스위치의 Hold 액션 편집 화면으로
-        - DN을 1초 이상 → Edit Mode 저장 후 종료 (issue #4)"""
+        - Up+Dn 동시에 1초 이상 → Edit Mode 저장 후 종료 (issue #4)"""
+        # 종료 콤보: Up(4)+Dn(9)이 모두 눌린 채 둘 다 EDIT_EXIT_HOLD 경과
+        if 4 in self.press_times and 9 in self.press_times:
+            if (now - self.press_times[4] >= self.EDIT_EXIT_HOLD
+                    and now - self.press_times[9] >= self.EDIT_EXIT_HOLD):
+                self._exit_edit_mode()   # press_times/hold_fired 비워짐 → 이후 release 무시
+                self.keys.events.clear()
+                return
         while event := self.keys.events.get():
             key = event.key_number
             if event.pressed:
@@ -994,10 +1005,10 @@ class FM3Controller:
                 t0 = self.press_times.pop(key, None)
                 if t0 is None:
                     continue
+                # 콤보 상대 키가 아직 눌려 있으면 (콤보 시도 중 한 발 먼저 뗌) 단축키로 처리하지 않음
+                if (key == 4 and 9 in self.press_times) or (key == 9 and 4 in self.press_times):
+                    continue
                 duration = now - t0
-                if key == 9 and duration >= self.EDIT_EXIT_HOLD:
-                    self._exit_edit_mode()
-                    return
                 self._edit_jump_to_switch(key, "hold" if duration >= self.hold_time else "press")
 
     def _edit_jump_to_switch(self, idx, which):

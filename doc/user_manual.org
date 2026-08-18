@@ -151,7 +151,7 @@ Adjust in Global Settings.
 | click       | select/enter / (while editing) confirm or next step                 |
 | hold        | back one level. While editing a value: end editing only. On MAIN: save & exit |
 | footswitch  | *shortcut*: press → jump to that switch's Press editor, hold → its Hold editor (current page) |
-| DN switch ≥ 1 s | save & exit Edit Mode from anywhere                                    |
+| Up + Dn together ≥ 1 s | save & exit Edit Mode from anywhere                             |
 
 ** Screen structure
 #+begin_example
