@@ -36,16 +36,6 @@ Use Fractal's SysEx protocol (supported by FM3/FM9 etc.) for *two-way communicat
 - Current scene number, preset/scene names, BPM
 - Tap-tempo LED sync, tuner screen
 
-*** Why not a programmable MIDI controller (e.g. Morningstar MC6 Pro)?
-Programmable controllers can *send* arbitrary SysEx and can trigger an action when an exact incoming
-message matches, so a limited sync is possible by hand — e.g. mapping each of the eight fixed
-scene-change replies to a preset toggle. But they cannot:
-- parse a variable-length reply byte by byte (the FM3 status dump is dozens of 3-byte packets in one message)
-- poll on a timer (no "ask the FM3 every 150 ms" loop)
-- extract text (preset/scene names) from a reply and show it on the display
-Full effect-block / channel / name sync therefore needs a controller that runs its own code —
-which is what this firmware gives the MIDI Captain (CircuitPython on RP2040).
-
 ** References
 + [[https://github.com/nicola-lunghi/hiper-midicaptain?tab=readme-ov-file][hiper-midicaptain]] :: A great starting point for MIDI Captain customization
   - MIDI Captain hardware spec

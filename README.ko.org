@@ -40,16 +40,6 @@ SysEx 미디 프로토콜(Fractal FM3/FM9 등에서 지원)을 사용한 *양방
 - 현재 Scene 번호, Preset/Scene 이름, BPM 표시
 - Tap tempo LED 동기화, Tuner 화면 표시
 
-*** 프로그래머블 미디 컨트롤러(예: Morningstar MC6 Pro)로는 안 되나?
-프로그래머블 컨트롤러는 임의 SysEx를 *송신*할 수 있고, 수신 메시지가 특정 바이트열과 정확히 일치하면
-액션을 실행하는 기능이 있어 수작업으로 제한적인 동기화는 가능합니다 — 예: scene 변경 응답 8종을
-각각 프리셋 토글에 매핑. 하지만 다음은 할 수 없습니다:
-- 가변 길이 응답을 바이트 단위로 해석 (FM3 status dump는 한 메시지 안에 3바이트 패킷 수십 개)
-- 타이머 폴링 ("0.15초마다 FM3에 조회" 루프 없음)
-- 응답에서 문자열(프리셋/씬 이름)을 꺼내 화면에 표시
-따라서 이펙트 블록/채널/이름까지 완전 동기화하려면 *자기 코드가 도는 컨트롤러*가 필요하고,
-이 펌웨어가 MIDI Captain(RP2040 + CircuitPython)에 그 역할을 부여합니다.
-
 ** 참고 사이트
 
 + [[https://github.com/nicola-lunghi/hiper-midicaptain?tab=readme-ov-file][hiper-midicaptain]] :: MidiCatain Customizing 출발점으로 좋은 사이트
