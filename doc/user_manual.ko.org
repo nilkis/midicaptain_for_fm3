@@ -206,7 +206,7 @@ MAIN
 | Color   | LED 색상 (아래 참조)                                         |
 | Rotate  | (effect, Press만) 채널 회전 sub-function ON/OFF              |
 | Chans   | (Rotate ON) 순환에 포함할 채널 선택                          |
-| Col.A~D | (Rotate ON) 채널별 색상                                      |
+| Col.A~D | (Rotate ON) 채널별 색상 — Color와 같은 방식(ALL / L1 / L2 / L3)으로 편집, 채널마다 LED 3개를 다른 색으로 지정 가능 |
 | Col.OD  | (looper Record) Overdub 색상                                 |
 
 일반 항목: 클릭 → 편집(=*=) → 회전으로 값 변경 → 클릭으로 확정

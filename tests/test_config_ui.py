@@ -547,6 +547,31 @@ S.keys.q.append(_Ev2(9, False)); S.process_buttons()
 assert S.edit_screen == S.SCR_PARAM and S.edit_btn_idx == 9   # 남은 Dn release는 단축키
 S._edit_back(); S._edit_back(); S._edit_back()
 print("issue #4 + edit shortcut OK")
+
+# ================= per-LED colors for rotation channels (Col.A~D) =================
+S._enter_edit_mode(); S.edit_page = 1; S.page_idx = 1; S.config = S.pages[1]["buttons"]; S._build_lookups()
+S.edit_btn_idx = 6; S.edit_press_idx = 0; S.edit_screen = S.SCR_PARAM   # DRIVE1 rotation
+a = S._cur_action(); a["ch_colors"] = ["YELLOW", "YELLOW_GREEN", "ORANGE", "RED"]
+S.edit_cursor = S._get_edit_params().index("Col.B"); S.edit_editing_value = False
+S._edit_click(); assert S.edit_editing_value and S.edit_led_idx == 3          # ALL
+S._edit_rotate(+1); assert a["ch_colors"][1] == "GREEN"                     # ALL → 문자열
+S._edit_click(); assert S.edit_led_idx == 0                                   # L1
+S._edit_rotate(+1); assert a["ch_colors"][1] == ["TEAL", "GREEN", "GREEN"]   # L1만, 리스트化
+S._edit_click(); S._edit_click(); assert S.edit_led_idx == 2                  # L3
+S._edit_rotate(-1); assert a["ch_colors"][1] == ["TEAL", "GREEN", "YELLOW_GREEN"]
+S._edit_click(); assert not S.edit_editing_value                              # L3 클릭 → 종료
+# 렌더: 채널 B 활성 시 3 LED가 각각 그 색
+DR = code.EFFECT_IDS["DRIVE1"]; S.fx_states[DR] = False; S.fx_channels[DR] = 1
+S.edit_mode = False
+S._update_button_leds(6)
+assert captured[6] == [code.pal("TEAL"), code.pal("GREEN"), code.pal("YELLOW_GREEN")], captured[6]
+S.fx_channels[DR] = 0; S._update_button_leds(6); assert captured[6] == [code.pal("YELLOW")] * 3   # 채널 A는 단색 그대로
+# 미리보기도 per-LED
+S.edit_mode = True; S.edit_screen = S.SCR_PARAM; S.edit_cursor = S._get_edit_params().index("Col.B")
+assert S._edit_preview_colors() == [code.pal("TEAL"), code.pal("GREEN"), code.pal("YELLOW_GREEN")]
+S.edit_mode = False
+a["ch_colors"] = ["YELLOW", "YELLOW_GREEN", "ORANGE", "RED"]
+print("per-LED channel colors OK")
 print("\nALL TESTS PASSED")
 
 # ================= per-LED color editing via Color click cycle =================

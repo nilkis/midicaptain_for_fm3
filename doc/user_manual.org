@@ -206,7 +206,7 @@ Switch → choose Press or Hold → item table
 | Color   | LED color (see below)                                                                |
 | Rotate  | (effect, Press only) channel-rotation sub-function ON/OFF                            |
 | Chans   | (Rotate ON) which channels to include in the rotation                                |
-| Col.A~D | (Rotate ON) color per channel                                                        |
+| Col.A~D | (Rotate ON) color per channel — edited like Color (ALL / L1 / L2 / L3), so each channel can have 3 different LED colors |
 | Col.OD  | (looper Record) overdub color                                                        |
 
 Regular items: click → edit (=*=) → turn to change → click to confirm

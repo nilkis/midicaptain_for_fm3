@@ -160,7 +160,8 @@ NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 #         | tuner | tap_tempo | looper | page_inc | page_dec
 #   scene:          number(1-8)
 #   effect:         effect(name), color(pal|list of 3 pal),
-#                   rotation(bool, hold sub-function), channels([0-3]), ch_colors([pal x4])
+#                   rotation(bool, hold sub-function), channels([0-3]),
+#                   ch_colors([4 x (pal | [pal,pal,pal])])  — 채널별 단색 또는 per-LED
 #   channel_select: effect(name), channel(0-3), color
 #   looper:         button(0-5), color, color2 (REC overdub 전용)
 #   나머지:         color
@@ -334,16 +335,20 @@ def color_off(c):
     return (int(c[0] * OFF_W), int(c[1] * OFF_W), int(c[2] * OFF_W))
 
 
-def action_colors(action):
-    """action의 color 필드 → LED 3개 RGB 리스트. 문자열이면 3개 동일, 리스트면 per-LED."""
-    c = action.get("color", "OFF")
-    if isinstance(c, list):
-        out = [pal(x) for x in c[:3]]
+def color_leds(spec):
+    """색 지정값 → LED 3개 RGB 리스트. 문자열(팔레트명)이면 3개 동일, 리스트면 per-LED."""
+    if isinstance(spec, list):
+        out = [pal(x) for x in spec[:3]]
         while len(out) < 3:
             out.append(out[-1] if out else (0, 0, 0))
         return out
-    rgb = pal(c)
+    rgb = pal(spec)
     return [rgb, rgb, rgb]
+
+
+def action_colors(action):
+    """action의 color 필드 → LED 3개 RGB 리스트."""
+    return color_leds(action.get("color", "OFF"))
 
 
 # ============================================================
@@ -1235,8 +1240,7 @@ class FM3Controller:
                 # sub-function: 현재 채널 색이 activation 색
                 ch = self.fx_channels.get(fx_id, 0)
                 ch_colors = a.get("ch_colors", ["GREEN", "YELLOW", "ORANGE", "RED"])
-                c = pal(ch_colors[ch]) if ch < len(ch_colors) else (0, 0, 0)
-                base = [c, c, c]
+                base = color_leds(ch_colors[ch]) if ch < len(ch_colors) else [(0, 0, 0)] * 3
             return base if not bypassed else [color_off(c) for c in base]
 
         if t == "scene":
@@ -1580,9 +1584,9 @@ class FM3Controller:
             self.edit_editing_value = not self.edit_editing_value
 
         elif s == self.SCR_PARAM:
-            if item == "Color":
+            if item == "Color" or item.startswith("Col.") and item != "Col.OD":
                 # 클릭: 편집 진입(대상 ALL) → 클릭마다 대상 순환 ALL→L1→L2→L3 → 다시 클릭 = 종료
-                # 회전 = 색 순환. 길게 누름 = 즉시 종료
+                # 회전 = 색 순환. 길게 누름 = 즉시 종료. (Color 및 Col.A~D 공통)
                 if not self.edit_editing_value:
                     self.edit_editing_value = True
                     self.edit_led_idx = 3
@@ -1716,7 +1720,7 @@ class FM3Controller:
             cc = list(a.get("ch_colors", ["GREEN", "YELLOW", "ORANGE", "RED"]))
             while len(cc) < 4:
                 cc.append("OFF")
-            cc[ch] = self._next_pal(cc[ch], delta)
+            cc[ch] = self._cycle_color_spec(cc[ch], delta)   # ALL 또는 L1~L3 대상
             a["ch_colors"] = cc
 
     def _next_pal(self, name, delta):
@@ -1740,21 +1744,22 @@ class FM3Controller:
         if item.startswith("Col."):
             ch = "ABCD".index(item[-1])
             cc = a.get("ch_colors", ["GREEN", "YELLOW", "ORANGE", "RED"])
-            c = pal(cc[ch]) if ch < len(cc) else (0, 0, 0)
-            return [c, c, c]
+            return color_leds(cc[ch]) if ch < len(cc) else [(0, 0, 0)] * 3
         return None
 
-    def _edit_color(self, a, delta):
-        c = a.get("color", "OFF")
+    def _cycle_color_spec(self, spec, delta):
+        """색 지정값(문자열 or 3-리스트)을 현재 편집 대상(edit_led_idx: 3=ALL, 0~2=L1~L3)에 따라 순환"""
         if self.edit_led_idx == 3:
-            cur = c if isinstance(c, str) else (c[0] if c else "OFF")
-            a["color"] = self._next_pal(cur, delta)
-        else:
-            lst = list(c) if isinstance(c, list) else [c, c, c]
-            while len(lst) < 3:
-                lst.append(lst[-1] if lst else "OFF")
-            lst[self.edit_led_idx] = self._next_pal(lst[self.edit_led_idx], delta)
-            a["color"] = lst
+            cur = spec if isinstance(spec, str) else (spec[0] if spec else "OFF")
+            return self._next_pal(cur, delta)          # ALL → 문자열로 통일
+        lst = list(spec) if isinstance(spec, list) else [spec, spec, spec]
+        while len(lst) < 3:
+            lst.append(lst[-1] if lst else "OFF")
+        lst[self.edit_led_idx] = self._next_pal(lst[self.edit_led_idx], delta)
+        return lst
+
+    def _edit_color(self, a, delta):
+        a["color"] = self._cycle_color_spec(a.get("color", "OFF"), delta)
 
     def _edit_target(self, a, delta):
         t = a.get("type", "none")
@@ -2070,6 +2075,8 @@ class FM3Controller:
                 name = item
                 if item == "Color" and e and self.edit_led_idx < 3:
                     name = "Col.%s" % self.LED_LABELS[self.edit_led_idx]  # Col.L1 등
+                elif item.startswith("Col.") and item != "Col.OD" and e and self.edit_led_idx < 3:
+                    name = "%s.%s" % (item, self.LED_LABELS[self.edit_led_idx])   # Col.A.L2 등 (7자)
                 prefix = "*" if e else (">" if sel else " ")
                 text = "%s%-7s %s" % (prefix, name[:7], val)
                 self._row(1 + r, text[:20], sel)
@@ -2092,8 +2099,14 @@ class FM3Controller:
         SW, GAP = self.SWATCH_SZ, 4
         a = self._cur_action()
         item = self._get_edit_params()[self.edit_cursor]
-        editing_led = (item == "Color" and self.edit_editing_value and self.edit_led_idx < 3)
-        per_led = (item == "Color" and (isinstance(a.get("color"), list) or editing_led))
+        is_ch = item.startswith("Col.") and item != "Col.OD"
+        if is_ch:
+            cc = a.get("ch_colors", [])
+            spec = cc["ABCD".index(item[-1])] if "ABCD".index(item[-1]) < len(cc) else "OFF"
+        else:
+            spec = a.get("color")
+        editing_led = ((item == "Color" or is_ch) and self.edit_editing_value and self.edit_led_idx < 3)
+        per_led = ((item == "Color" or is_ch) and (isinstance(spec, list) or editing_led))
         n = 3 if per_led else 1
         # 견본은 값 컬럼 시작(세로선 오른쪽)에 왼쪽 정렬 — 텍스트 값과 겹치지 않음
         x0 = 2 + 12 * 8 + 4
@@ -2163,7 +2176,12 @@ class FM3Controller:
         if item.startswith("Col."):
             ch = "ABCD".index(item[-1])
             cc = a.get("ch_colors", ["GREEN", "YELLOW", "ORANGE", "RED"])
-            return PALETTE_ABBREV.get(cc[ch], "?") if ch < len(cc) else "?"
+            if ch >= len(cc):
+                return "?"
+            c = cc[ch]
+            if isinstance(c, list):
+                return "/".join(PALETTE_ABBREV.get(x, "?")[:2] for x in c[:3])
+            return PALETTE_ABBREV.get(c, "?")
         return ""
 
     # --------------------------------------------------------
